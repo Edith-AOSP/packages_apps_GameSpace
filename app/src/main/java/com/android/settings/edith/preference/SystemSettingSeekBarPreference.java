@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.crdroid.settings.preferences;
+package com.android.settings.edith.preference;
 
 import android.content.Context;
 import android.util.AttributeSet;
+
+import com.crdroid.settings.preferences.SystemSettingsStore;
 
 public class SystemSettingSeekBarPreference extends CustomSeekBarPreference {
 
