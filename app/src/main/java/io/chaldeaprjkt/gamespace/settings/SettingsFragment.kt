@@ -26,16 +26,26 @@ import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import com.android.settingslib.PrimarySwitchPreference
 import androidx.preference.PreferenceFragmentCompat
 import dagger.hilt.android.AndroidEntryPoint
 import io.chaldeaprjkt.gamespace.R
+import io.chaldeaprjkt.gamespace.data.AppSettings
+import io.chaldeaprjkt.gamespace.discord.DiscordPresenceManager
 import io.chaldeaprjkt.gamespace.preferences.AppListPreferences
 import io.chaldeaprjkt.gamespace.preferences.appselector.AppSelectorActivity
 import io.chaldeaprjkt.gamespace.preferences.QuickStartAppPreference
 import io.chaldeaprjkt.gamespace.preferences.QuickStartAppPreferenceDialogFragment
+import javax.inject.Inject
 
 @AndroidEntryPoint(PreferenceFragmentCompat::class)
 class SettingsFragment : Hilt_SettingsFragment() {
+
+    @Inject
+    lateinit var discordPresence: DiscordPresenceManager
+
+    @Inject
+    lateinit var appSettings: AppSettings
 
     private var apps: AppListPreferences? = null
 
@@ -81,11 +91,35 @@ class SettingsFragment : Hilt_SettingsFragment() {
                 selectorResult.launch(Intent(context, AppSelectorActivity::class.java))
                 return@setOnPreferenceClickListener true
             }
+
+        findPreference<PrimarySwitchPreference>(AppSettings.KEY_DISCORD_RPC)?.let { preference ->
+            preference.isChecked = appSettings.discordRpc
+            if (!DiscordPresenceManager.isSupported(requireContext())) {
+                preference.isEnabled = false
+                preference.setSwitchEnabled(false)
+                preference.summary = getString(R.string.discord_rpc_unavailable)
+            } else {
+                preference.setOnPreferenceClickListener {
+                    startActivity(Intent(context, DiscordRpcActivity::class.java))
+                    true
+                }
+                preference.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == false) {
+                        discordPresence.stopGame(immediate = true)
+                    } else {
+                        discordPresence.restart()
+                    }
+                    true
+                }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         apps?.updateAppList()
+        findPreference<PrimarySwitchPreference>(AppSettings.KEY_DISCORD_RPC)?.isChecked =
+            appSettings.discordRpc
     }
 
     override fun onDisplayPreferenceDialog(preference: Preference) {

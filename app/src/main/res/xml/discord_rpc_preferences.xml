@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <com.android.settingslib.widget.MainSwitchPreference
+        android:defaultValue="false"
+        android:key="gamespace_discord_rpc"
+        android:title="@string/discord_rpc_title" />
+
+    <Preference
+        android:key="discord_application_id"
+        android:selectable="false"
+        android:title="@string/discord_app_id_title" />
+
+    <Preference
+        android:key="discord_restart"
+        android:title="@string/discord_restart_title"
+        android:summary="@string/discord_restart_summary" />
+</PreferenceScreen>

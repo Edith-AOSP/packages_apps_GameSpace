@@ -17,7 +17,9 @@
 package io.chaldeaprjkt.gamespace.settings
 
 import android.os.Bundle
+import android.util.Log
 import com.android.settingslib.collapsingtoolbar.CollapsingToolbarBaseActivity
+import com.discord.socialsdk.DiscordSocialSdkInit
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint(CollapsingToolbarBaseActivity::class)
@@ -25,6 +27,11 @@ class SettingsActivity : Hilt_SettingsActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            DiscordSocialSdkInit.setEngineActivity(this)
+        } catch (e: Throwable) {
+            Log.w("GameSpaceDiscord", "Discord SDK context unavailable", e)
+        }
         if (savedInstanceState == null) {
             supportFragmentManager
                 .beginTransaction()

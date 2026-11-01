@@ -19,6 +19,8 @@
     package="io.chaldeaprjkt.gamespace"
     android:sharedUserId="android.uid.system">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
     <uses-permission android:name="android.permission.GET_TASKS" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS" />
     <uses-permission android:name="android.permission.MANAGE_GAME_MODE" />
@@ -37,6 +39,13 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <queries>
+        <package android:name="com.discord" />
+        <intent>
+            <action android:name="com.discord.socialsdk.rpc.IDiscordRpcService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".GameSpace"
@@ -59,6 +68,18 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:label="@string/app_selector_label" />
+
+        <activity
+            android:name=".settings.DiscordRpcActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
+
+        <activity
+            android:name=".discord.DiscordContextActivity"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
 
         <service
             android:name=".gamebar.SessionService"

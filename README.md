@@ -6,6 +6,11 @@ Gamespace requires several patches to be applied on the AOSP's SystemUI and Sett
 - [frameworks/base](https://github.com/chaldeaprjkt/chaldea_frameworks_base/commits/13/gamespace)
 - [packages/apps/Settings](https://github.com/chaldeaprjkt/chaldea_packages_apps_Settings/commits/13/gamespace)
 
+## Discord Rich Presence
+
+See [DISCORD_RPC.md](DISCORD_RPC.md) for Discord application setup and the
+application ID.
+
 ## License
 
 This work is licensed under [Apache 2.0 License](LICENSE.md).

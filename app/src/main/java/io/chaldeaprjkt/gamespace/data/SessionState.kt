@@ -26,4 +26,5 @@ data class SessionState(
     var headsup: Boolean? = null,
     var threeScreenshot: Int = 0,
     var ringerMode: Int = AudioManager.RINGER_MODE_NORMAL,
+    var startedAt: Long = 0L,
 )

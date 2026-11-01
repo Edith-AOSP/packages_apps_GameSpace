@@ -83,6 +83,12 @@
             android:defaultValue="false"
             android:key="gamespace_lock_gesture"
             android:title="@string/lock_gesture_title" />
+
+        <com.android.settingslib.PrimarySwitchPreference
+            android:defaultValue="false"
+            android:key="gamespace_discord_rpc"
+            android:summary="@string/discord_rpc_summary"
+            android:title="@string/discord_rpc_title" />
             
         <com.crdroid.settings.preferences.CustomSeekBarPreference
             android:key="gamespace_menu_opacity"

@@ -46,6 +46,15 @@
     <string name="stay_awake_title">Stay Awake</string>
     <string name="stay_awake_summary">Keep screen awake while in the game</string>
     <string name="lock_gesture_title">Lock gesture</string>
+    <string name="discord_presence_name">Game Space</string>
+    <string name="discord_app_id_title">Application ID</string>
+    <string name="discord_app_id_missing">Not configured</string>
+    <string name="discord_restart_title">Restart Rich Presence</string>
+    <string name="discord_restart_summary">Reconnect to Discord and reinitialize the presence context</string>
+    <string name="discord_restart_done">Rich Presence restarted</string>
+    <string name="discord_rpc_title">Discord Rich Presence</string>
+    <string name="discord_rpc_summary">Show the game you are playing on Discord. Requires the Discord app signed in.</string>
+    <string name="discord_rpc_unavailable">Requires the Discord app and a configured Social SDK application ID</string>
 
     <string name="ringer_mode_title">In-game ringer mode</string>
     <string-array name="ringer_mode_entries">

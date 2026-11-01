@@ -14,6 +14,10 @@ android_app {
         "java/**/*.kt",
         "java/**/*.aidl",
     ],
+    jni_libs: [
+        "libdiscord_partner_sdk",
+        "libgamespace_discord",
+    ],
     aidl: {
         local_include_dirs: ["java"],
     },
@@ -24,10 +28,13 @@ android_app {
         "com.google.android.material_material",
         "kotlin-stdlib",
         "kotlinx-coroutines-android",
-        "gson-prebuilt-jar-2.9.1",
+        "gson",
         "hilt_android",
         "org.lineageos.platform.internal",
         "LineagePreferenceLib",
+        "discord_partner_sdk_java",
+        "libwebrtc_java",
+        "SettingsLibMainSwitchPreference",
     ],
     kotlincflags: [
         "-opt-in=kotlin.Experimental",
@@ -37,10 +44,31 @@ android_app {
         "dagger2-compiler",
     ],
 
+    optimize: {
+        proguard_flags_files: ["proguard.flags"],
+    },
+
     required: [
         "ANGLE",
         "privapp_whitelist_io.chaldeaprjkt.gamespace.xml"
     ],
+}
+
+cc_library_shared {
+    name: "libgamespace_discord",
+    srcs: [
+        "cpp/gamespace_discord_real.cpp",
+    ],
+    shared_libs: [
+        "libdiscord_partner_sdk",
+        "liblog",
+    ],
+    header_libs: [
+        "jni_headers",
+        "libdiscord_partner_sdk_headers",
+    ],
+    cpp_std: "c++20",
+    stl: "c++_static",
 }
 
 prebuilt_etc_xml {

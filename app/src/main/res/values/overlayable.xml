@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <overlayable name="GameSpaceConfig">
+        <policy type="public">
+            <item type="string" name="discord_application_id" />
+        </policy>
+    </overlayable>
+</resources>

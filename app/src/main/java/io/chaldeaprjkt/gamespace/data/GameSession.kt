@@ -52,15 +52,34 @@ class GameSession @Inject constructor(
             } ?: "")
             .apply()
 
+    val activePackage: String?
+        get() = state?.packageName
+
+    val startedAt: Long
+        get() = state?.startedAt ?: 0L
+
     fun register(sessionName: String) {
-        if (state?.packageName != sessionName) unregister()
+        val previous = state
+        val samePackage = previous?.packageName == sessionName
+        if (!samePackage) unregister()
 
         state = SessionState(
             packageName = sessionName,
-            autoBrightness = systemSettings.autoBrightness,
-            headsup = systemSettings.headsup,
-            threeScreenshot = systemSettings.threeScreenshot,
-            ringerMode = audioManager.ringerModeInternal,
+            autoBrightness = if (samePackage) previous?.autoBrightness
+                else systemSettings.autoBrightness,
+            headsup = if (samePackage) previous?.headsup else systemSettings.headsup,
+            threeScreenshot = if (samePackage) {
+                previous?.threeScreenshot ?: systemSettings.threeScreenshot
+            } else {
+                systemSettings.threeScreenshot
+            },
+            ringerMode = if (samePackage) {
+                previous?.ringerMode ?: audioManager.ringerModeInternal
+            } else {
+                audioManager.ringerModeInternal
+            },
+            startedAt = if (samePackage) previous?.startedAt ?: System.currentTimeMillis()
+                else System.currentTimeMillis(),
         )
         if (appSettings.noAutoBrightness) {
             systemSettings.autoBrightness = false

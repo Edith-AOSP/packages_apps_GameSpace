@@ -32,6 +32,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import io.chaldeaprjkt.gamespace.data.AppSettings
 import io.chaldeaprjkt.gamespace.data.GameSession
 import io.chaldeaprjkt.gamespace.data.SystemSettings
+import io.chaldeaprjkt.gamespace.discord.DiscordPresenceManager
 import io.chaldeaprjkt.gamespace.utils.GameModeUtils
 import io.chaldeaprjkt.gamespace.utils.ScreenUtils
 import io.chaldeaprjkt.gamespace.utils.isServiceRunning
@@ -60,6 +61,9 @@ class SessionService : Hilt_SessionService() {
 
     @Inject
     lateinit var callListener: CallListener
+
+    @Inject
+    lateinit var discordPresence: DiscordPresenceManager
 
     private val scope = CoroutineScope(Job() + Dispatchers.IO)
     private var isRunning = false
@@ -140,6 +144,7 @@ class SessionService : Hilt_SessionService() {
         }
 
         session.unregister()
+        discordPresence.stopGame()
         gameModeUtils.unbind()
         screenUtils.unbind()
         callListener.destroy()
@@ -163,9 +168,12 @@ class SessionService : Hilt_SessionService() {
                     return
                 }
                 tarketPkgName = app
-                session.unregister()
+                if (session.activePackage != app) {
+                    session.unregister()
+                }
                 session.register(app)
                 applyGameModeConfig(app)
+                discordPresence.startGame(app)
                 gameBar.onGameStart()
                 screenUtils.stayAwake = appSettings.stayAwake
                 screenUtils.lockGesture = appSettings.lockGesture

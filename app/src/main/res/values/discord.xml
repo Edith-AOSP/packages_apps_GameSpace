@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Discord Social SDK application ID. Empty disables Rich Presence. -->
+    <string name="discord_application_id" translatable="false"></string>
+</resources>
