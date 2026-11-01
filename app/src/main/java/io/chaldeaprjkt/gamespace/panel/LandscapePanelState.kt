@@ -22,7 +22,15 @@ data class LandscapePanelState(
     val gestures: Boolean = true,
     val stayAwake: Boolean = false,
     val headsUp: Boolean = true,
-)
+    val tiles: List<PanelTileConfig> = PanelTiles.defaults(),
+) {
+    fun isTileEnabled(id: PanelTileId): Boolean = when (id) {
+        PanelTileId.FPS -> fps
+        PanelTileId.GESTURES -> gestures
+        PanelTileId.STAY_AWAKE -> stayAwake
+        PanelTileId.HEADS_UP -> headsUp
+    }
+}
 
 data class PanelAnchor(
     val barX: Int,
@@ -42,4 +50,5 @@ data class LandscapePanelActions(
     val onToggleStayAwake: () -> Unit,
     val onToggleHeadsUp: () -> Unit,
     val onSetMode: (Int) -> Unit,
+    val onPanelTilesChanged: (List<PanelTileConfig>) -> Unit,
 )

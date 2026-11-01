@@ -55,6 +55,7 @@ import io.chaldeaprjkt.gamespace.panel.LandscapePanel
 import io.chaldeaprjkt.gamespace.panel.LandscapePanelActions
 import io.chaldeaprjkt.gamespace.panel.LandscapePanelState
 import io.chaldeaprjkt.gamespace.panel.PanelAnchor
+import io.chaldeaprjkt.gamespace.panel.PanelTiles
 import io.chaldeaprjkt.gamespace.panel.ServiceComposeOwner
 import io.chaldeaprjkt.gamespace.settings.SettingsActivity
 import io.chaldeaprjkt.gamespace.utils.*
@@ -119,6 +120,7 @@ class GameBarService : Hilt_GameBarService() {
     private var isGameStarting = false
     private var isRecording = false
     private var panelOwner: ServiceComposeOwner? = null
+    private var panelHideRunnable: Runnable? = null
     private val landscapeState = MutableStateFlow(LandscapePanelState())
 
     private var barExpanded = false
@@ -134,23 +136,46 @@ class GameBarService : Hilt_GameBarService() {
         set(value) {
             field = value
             if (value) {
+                panelHideRunnable?.let {
+                    handler.removeCallbacks(it)
+                    panelHideRunnable = null
+                }
+                if (::rootPanelView.isInitialized) {
+                    rootPanelView.animate().cancel()
+                }
+                panelLayoutParam.flags = panelLayoutParam.flags and
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
                 if (!::rootPanelView.isInitialized || !rootPanelView.isAttachedToWindow) {
                     setupPanelView()
                 }
                 if (!rootPanelView.isAttachedToWindow) {
                     wm.addView(rootPanelView, panelLayoutParam)
-                    rootPanelView.alpha = 1f
-                    rootPanelView.visibility = View.VISIBLE
+                } else {
+                    runCatching {
+                        wm.updateViewLayout(rootPanelView, panelLayoutParam)
+                    }
                 }
+                rootPanelView.alpha = 1f
+                rootPanelView.visibility = View.VISIBLE
             } else {
                 if (safeAttached(::rootPanelView.isInitialized, rootPanelView)) {
+                    panelLayoutParam.flags =
+                        panelLayoutParam.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                    runCatching {
+                        wm.updateViewLayout(rootPanelView, panelLayoutParam)
+                    }
                     rootPanelView.fadeOut {
                         rootPanelView.visibility = View.INVISIBLE
-                        handler.postDelayed({
-                            runCatching {
-                                wm.removeView(rootPanelView)
-                            }.onFailure { it.printStackTrace() }
-                        }, 50)
+                        if (panelHideRunnable == null) {
+                            val hide = Runnable {
+                                panelHideRunnable = null
+                                runCatching {
+                                    wm.removeView(rootPanelView)
+                                }.onFailure { it.printStackTrace() }
+                            }
+                            panelHideRunnable = hide
+                            handler.postDelayed(hide, 50)
+                        }
                     }
                 }
             }
@@ -242,11 +267,18 @@ class GameBarService : Hilt_GameBarService() {
             dockCollapsedMenu()
         }
         if (::rootPanelView.isInitialized && showPanel) {
+            panelHideRunnable?.let {
+                handler.removeCallbacks(it)
+                panelHideRunnable = null
+            }
+            rootPanelView.animate().cancel()
             runCatching {
                 if (rootPanelView.isAttachedToWindow) {
                     wm.removeViewImmediate(rootPanelView)
                 }
             }
+            panelLayoutParam.flags = panelLayoutParam.flags and
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
             setupPanelView()
             wm.addView(rootPanelView, panelLayoutParam)
             rootPanelView.alpha = 1f
@@ -460,6 +492,10 @@ class GameBarService : Hilt_GameBarService() {
                 refreshLandscapeState()
             }
         },
+        onPanelTilesChanged = { tiles ->
+            appSettings.panelTiles = PanelTiles.encode(tiles)
+            refreshLandscapeState()
+        },
     )
 
     private fun refreshLandscapeState() {
@@ -479,6 +515,7 @@ class GameBarService : Hilt_GameBarService() {
             gestures = !appSettings.noThreeScreenshot,
             stayAwake = appSettings.stayAwake,
             headsUp = !appSettings.danmakuNotification,
+            tiles = PanelTiles.decode(appSettings.panelTiles),
         )
     }
 

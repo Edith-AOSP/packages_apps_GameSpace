@@ -20,9 +20,17 @@ import android.graphics.drawable.Drawable
 import android.os.BatteryManager
 import android.os.Build
 import android.view.View
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +45,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -54,11 +63,15 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -69,6 +82,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -94,6 +108,17 @@ fun LandscapePanel(
     anchor: PanelAnchor,
 ) {
     val scrimInteraction = remember { MutableInteractionSource() }
+    var editing by remember { mutableStateOf(false) }
+    var normalScale by remember { mutableStateOf(1f) }
+    var normalPanelHeight by remember { mutableStateOf(0) }
+    var scaleLocked by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editing) {
+        if (scaleLocked) {
+            delay(280)
+            scaleLocked = false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -102,31 +127,67 @@ fun LandscapePanel(
             .clickable(
                 interactionSource = scrimInteraction,
                 indication = null,
-                onClick = actions.onDismiss,
+                onClick = {
+                    editing = false
+                    scaleLocked = false
+                    actions.onDismiss()
+                },
             )
     ) {
         Layout(
             content = {
-                PanelSheet(state = state, actions = actions)
+                PanelSheet(
+                    state = state,
+                    actions = actions,
+                    editing = editing,
+                    onCustomize = {
+                        editing = !editing
+                        scaleLocked = true
+                    },
+                )
             },
             modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->
             val margin = 16.dp.roundToPx()
             val gap = 12.dp.roundToPx()
-            val maxWidth = min(520.dp.roundToPx(), constraints.maxWidth - margin * 2)
+            val landscape = constraints.maxWidth > constraints.maxHeight
+            val maxPanelWidth = if (landscape) 400.dp else 520.dp
+            val maxWidth = min(maxPanelWidth.roundToPx(), constraints.maxWidth - margin * 2)
                 .coerceAtLeast(0)
             val availableHeight = (constraints.maxHeight - anchor.topInset - anchor.bottomInset -
                 margin * 2).coerceAtLeast(0)
+            val contentMaxHeight = if (normalScale > 0f) {
+                (availableHeight / normalScale).roundToInt()
+            } else {
+                availableHeight
+            }
             val panel = measurables.first().measure(
-                Constraints(maxWidth = maxWidth, maxHeight = Constraints.Infinity)
+                Constraints(
+                    maxWidth = maxWidth,
+                    maxHeight = if (editing || scaleLocked) {
+                        contentMaxHeight
+                    } else {
+                        Constraints.Infinity
+                    },
+                )
             )
-            val scale = if (availableHeight > 0 && panel.height > availableHeight) {
+            val fitScale = if (availableHeight > 0 && panel.height > availableHeight) {
                 (availableHeight.toFloat() / panel.height).coerceAtLeast(0.35f)
             } else {
                 1f
             }
+            val scale = if (editing || scaleLocked) {
+                normalScale
+            } else {
+                normalScale = fitScale
+                fitScale
+            }
             val panelWidth = (panel.width * scale).roundToInt()
             val panelHeight = (panel.height * scale).roundToInt()
+            if (!editing && !scaleLocked) {
+                normalPanelHeight = panelHeight
+            }
+            val anchorHeight = if (editing || scaleLocked) normalPanelHeight else panelHeight
             val stripBleed = (12.dp * scale).roundToPx()
 
             val barCenterX = anchor.barX + anchor.barWidth / 2
@@ -140,7 +201,7 @@ fun LandscapePanel(
             val maxX = anchor.screenWidth - panelWidth - margin
             x = if (maxX >= minX) x.coerceIn(minX, maxX) else minX
 
-            var y = barCenterY - panelHeight / 2
+            var y = barCenterY - anchorHeight / 2
             val minY = anchor.topInset + margin
             val maxY = anchor.screenHeight - anchor.bottomInset - panelHeight - margin
             y = if (maxY >= minY) y.coerceIn(minY, maxY) else minY
@@ -160,6 +221,8 @@ fun LandscapePanel(
 private fun PanelSheet(
     state: LandscapePanelState,
     actions: LandscapePanelActions,
+    editing: Boolean,
+    onCustomize: () -> Unit,
 ) {
     val context = LocalContext.current
     val stats by produceState(initialValue = DeviceStats(), context) {
@@ -175,6 +238,11 @@ private fun PanelSheet(
         }
     }
     val interaction = remember { MutableInteractionSource() }
+    val stripFraction by animateFloatAsState(
+        targetValue = if (editing) 0f else 1f,
+        animationSpec = tween(220),
+        label = "panelStripVisibility",
+    )
 
     Box(
         modifier = Modifier
@@ -189,34 +257,82 @@ private fun PanelSheet(
                 onClick = {},
             ),
     ) {
-        Column {
-            StatusHeader(clock = clock, batteryPercent = stats.batteryPercent)
+        Column(modifier = Modifier.padding(top = 8.dp)) {
+            StatusHeader(
+                clock = clock,
+                batteryPercent = stats.batteryPercent,
+                editing = editing,
+                onCustomize = onCustomize,
+            )
+            Spacer(Modifier.height(8.dp))
             GameStrip(
                 state = state,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .startBleed(12.dp),
+                    .collapseVertically(stripFraction)
+                    .startBleed(12.dp)
+                    .alpha(stripFraction),
             )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 14.dp),
-            ) {
-                SystemControls(
-                    stats = stats,
-                    mode = state.gameMode,
-                    batteryPercent = stats.batteryPercent,
-                    actions = actions,
-                )
-                Spacer(Modifier.height(14.dp))
-                TileGrid(state = state, actions = actions)
+            AnimatedContent(
+                targetState = editing,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    (fadeIn(tween(200)) +
+                        expandVertically(tween(220), expandFrom = Alignment.Top, clip = false))
+                        .togetherWith(
+                            fadeOut(tween(140)) +
+                                shrinkVertically(
+                                    tween(180),
+                                    shrinkTowards = Alignment.Top,
+                                    clip = false,
+                                )
+                        )
+                        .using(SizeTransform(clip = false))
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "panelEditAnimation",
+            ) { isEditing ->
+                if (isEditing) {
+                    PanelTileEditor(
+                        config = state.tiles,
+                        onConfigChanged = actions.onPanelTilesChanged,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp),
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 12.dp,
+                                bottom = 14.dp,
+                            ),
+                    ) {
+                        SystemControls(
+                            stats = stats,
+                            mode = state.gameMode,
+                            batteryPercent = stats.batteryPercent,
+                            actions = actions,
+                        )
+                        Spacer(Modifier.height(14.dp))
+                        TileGrid(state = state, actions = actions)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun StatusHeader(clock: String, batteryPercent: Int) {
+private fun StatusHeader(
+    clock: String,
+    batteryPercent: Int,
+    editing: Boolean,
+    onCustomize: () -> Unit,
+) {
     val dark = isSystemInDarkTheme()
     val batteryFill = if (dark) {
         MaterialTheme.colorScheme.onSurface
@@ -267,12 +383,12 @@ private fun StatusHeader(clock: String, batteryPercent: Int) {
             )
         }
         Spacer(Modifier.width(10.dp))
-        CustomizeButton()
+        CustomizeButton(editing = editing, onClick = onCustomize)
     }
 }
 
 @Composable
-private fun CustomizeButton() {
+private fun CustomizeButton(editing: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(32.dp)
@@ -281,16 +397,25 @@ private fun CustomizeButton() {
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(),
-                onClick = {},
+                onClick = onClick,
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = DashboardCustomize,
-            contentDescription = "Customize",
-            modifier = Modifier.size(17.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (editing) {
+            Icon(
+                painter = painterResource(R.drawable.ic_check),
+                contentDescription = stringResource(R.string.panel_tiles_done),
+                modifier = Modifier.size(17.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            Icon(
+                imageVector = DashboardCustomize,
+                contentDescription = stringResource(R.string.panel_tiles_customize),
+                modifier = Modifier.size(17.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -410,7 +535,7 @@ private fun SystemControls(
 private fun StatsRow(stats: DeviceStats) {
     Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
         StatBlock(
-            icon = R.drawable.thermometer,
+            icon = R.drawable.ic_developer_board,
             value = if (stats.cpuPercent >= 0) "${stats.cpuPercent}%" else "—",
             detail = "${stats.temperatureC}°C",
         )
@@ -622,49 +747,52 @@ private fun TileGrid(
     actions: LandscapePanelActions,
     modifier: Modifier = Modifier,
 ) {
+    val tiles = state.tiles.filter { it.visible }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PanelTile(
-                title = "FPS Info",
-                enabled = state.fps,
-                icon = R.drawable.ic_fps,
-                onClick = actions.onToggleFps,
-                modifier = Modifier.weight(1f),
+        if (tiles.isEmpty()) {
+            Text(
+                text = stringResource(R.string.panel_tiles_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            PanelTile(
-                title = "Gestures",
-                enabled = state.gestures,
-                icon = R.drawable.ic_action_screenshot,
-                onClick = actions.onToggleGestures,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PanelTile(
-                title = "Stay Awake",
-                enabled = state.stayAwake,
-                icon = R.drawable.ic_awake,
-                onClick = actions.onToggleStayAwake,
-                modifier = Modifier.weight(1f),
-            )
-            PanelTile(
-                title = "Heads-up",
-                enabled = state.headsUp,
-                icon = R.drawable.ic_action_heads_up,
-                onClick = actions.onToggleHeadsUp,
-                modifier = Modifier.weight(1f),
-            )
+        } else {
+            tiles.chunked(2).forEach { rowTiles ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowTiles.forEach { tile ->
+                        val spec = PanelTiles.spec(tile.id)
+                        PanelTile(
+                            title = stringResource(spec.titleRes),
+                            enabled = state.isTileEnabled(tile.id),
+                            icon = spec.iconRes,
+                            onClick = {
+                                when (tile.id) {
+                                    PanelTileId.FPS -> actions.onToggleFps()
+                                    PanelTileId.GESTURES -> actions.onToggleGestures()
+                                    PanelTileId.STAY_AWAKE -> actions.onToggleStayAwake()
+                                    PanelTileId.HEADS_UP -> actions.onToggleHeadsUp()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (rowTiles.size == 1) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PanelTile(
+internal fun PanelTile(
     title: String,
     enabled: Boolean,
     icon: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    interactive: Boolean = true,
+    statusText: String? = if (enabled) "On" else "Off",
 ) {
     val background = if (enabled) {
         MaterialTheme.colorScheme.primary
@@ -681,7 +809,7 @@ private fun PanelTile(
         modifier = modifier
             .height(66.dp)
             .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick),
+            .then(if (interactive) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(18.dp),
         color = background,
     ) {
@@ -708,13 +836,29 @@ private fun PanelTile(
                         MaterialTheme.colorScheme.onSurface
                     },
                 )
-                Text(
-                    text = if (enabled) "On" else "Off",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = foreground,
-                )
+                statusText?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = foreground,
+                    )
+                }
             }
         }
+    }
+}
+
+private fun Modifier.collapseVertically(fraction: Float): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(
+        constraints.copy(
+            minHeight = 0,
+            maxHeight = Constraints.Infinity,
+        )
+    )
+    val value = fraction.coerceIn(0f, 1f)
+    val height = (placeable.height * value).roundToInt().coerceAtLeast(0)
+    layout(constraints.maxWidth, height) {
+        placeable.place(0, 0)
     }
 }
 
