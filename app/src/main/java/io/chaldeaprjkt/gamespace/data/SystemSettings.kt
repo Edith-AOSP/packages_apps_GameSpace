@@ -19,11 +19,12 @@ package io.chaldeaprjkt.gamespace.data
 import android.content.Context
 import android.os.UserHandle
 import android.provider.Settings
+import com.android.internal.view.RotationPolicy
 import io.chaldeaprjkt.gamespace.utils.GameModeUtils
 import javax.inject.Inject
 
 class SystemSettings @Inject constructor(
-    context: Context,
+    private val context: Context,
     private val gameModeUtils: GameModeUtils
 ) {
 
@@ -59,20 +60,9 @@ class SystemSettings @Inject constructor(
         }
 
     var rotationLocked
-        get() =
-            Settings.System.getIntForUser(
-                resolver,
-                Settings.System.ACCELEROMETER_ROTATION,
-                1,
-                UserHandle.USER_CURRENT
-            ) == 0
+        get() = RotationPolicy.isRotationLocked(context)
         set(locked) {
-            Settings.System.putIntForUser(
-                resolver,
-                Settings.System.ACCELEROMETER_ROTATION,
-                if (locked) 0 else 1,
-                UserHandle.USER_CURRENT
-            )
+            RotationPolicy.setRotationLock(context, locked, ROTATION_CALLER)
         }
 
     var threeScreenshot
@@ -108,4 +98,8 @@ class SystemSettings @Inject constructor(
         }
 
     private fun Boolean.toInt() = if (this) 1 else 0
+
+    private companion object {
+        const val ROTATION_CALLER = "GameSpacePanel"
+    }
 }

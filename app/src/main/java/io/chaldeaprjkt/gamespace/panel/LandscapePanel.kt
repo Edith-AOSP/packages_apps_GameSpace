@@ -24,8 +24,11 @@ import android.view.View
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -71,6 +74,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,11 +83,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -101,7 +107,9 @@ import java.util.Locale
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -800,20 +808,13 @@ private fun TileGrid(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(rowGap),
             ) {
-                pages[page].chunked(2).forEach { rowTiles ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowTiles.forEach { tile ->
-                            TileItem(
-                                tile = tile,
-                                state = state,
-                                actions = actions,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (rowTiles.size == 1) {
-                            Spacer(Modifier.weight(1f))
-                        }
-                    }
+                pages[page].chunked(2).forEachIndexed { rowIndex, rowTiles ->
+                    BouncyTileRow(
+                        tiles = rowTiles,
+                        state = state,
+                        actions = actions,
+                        rowKey = page * 2 + rowIndex,
+                    )
                 }
             }
         }
@@ -831,11 +832,92 @@ private fun TileGrid(
 }
 
 @Composable
+private fun BouncyTileRow(
+    tiles: List<PanelTileConfig>,
+    state: LandscapePanelState,
+    actions: LandscapePanelActions,
+    rowKey: Int,
+) {
+    val density = LocalDensity.current
+    val bouncePx = with(density) { TILE_BOUNCE.toPx() }
+    val animatables = remember(rowKey, tiles.size) {
+        List(tiles.size) { Animatable(0f) }
+    }
+    val jobs = remember(rowKey, tiles.size) { MutableList(tiles.size) { null as Job? } }
+    val scope = rememberCoroutineScope()
+
+    fun bounce(index: Int) {
+        jobs[index]?.cancel()
+        val anim = animatables[index]
+        jobs[index] = scope.launch {
+            // One coroutine for the whole press, so a quick tap still shows it.
+            anim.snapTo(0f)
+            anim.animateTo(bouncePx, tween(durationMillis = BOUNCE_OUT_MS))
+            anim.animateTo(0f, tween(durationMillis = BOUNCE_BACK_MS))
+        }
+    }
+
+    Layout(
+        content = {
+            tiles.forEachIndexed { index, tile ->
+                TileItem(
+                    tile = tile,
+                    state = state,
+                    actions = actions,
+                    onBounce = { bounce(index) },
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TILE_HEIGHT),
+    ) { measurables, constraints ->
+        val gap = GRID_GAP.roundToPx()
+        val count = measurables.size
+        val total = (constraints.maxWidth - gap * (count - 1)).coerceAtLeast(0)
+        val base = if (count > 0) total.toFloat() / count else 0f
+        val tileHeight = TILE_HEIGHT.roundToPx()
+
+        // The pressed tile grows only toward its sibling, and the sibling gives up exactly
+        // that width, so the row keeps its size and nothing leaves the container.
+        val widths = FloatArray(count) { base }
+        if (count > 1) {
+            for (index in 0 until count) {
+                val grown = animatables[index].value
+                if (grown <= 0f) continue
+                if (index < count - 1) {
+                    widths[index] += grown
+                    widths[index + 1] -= grown
+                } else {
+                    widths[index] += grown
+                    widths[index - 1] -= grown
+                }
+            }
+        }
+
+        val placeables = measurables.mapIndexed { index, measurable ->
+            measurable.measure(
+                Constraints.fixed(widths[index].roundToInt().coerceAtLeast(0), tileHeight)
+            )
+        }
+
+        layout(constraints.maxWidth, tileHeight) {
+            var x = 0f
+            placeables.forEachIndexed { index, placeable ->
+                placeable.place(x.roundToInt(), 0)
+                x += widths[index] + gap
+            }
+        }
+    }
+}
+
+@Composable
 private fun TileItem(
     tile: PanelTileConfig,
     state: LandscapePanelState,
     actions: LandscapePanelActions,
     modifier: Modifier = Modifier,
+    onBounce: () -> Unit = {},
 ) {
     val spec = PanelTiles.spec(tile.id)
     val enabled = state.isTileEnabled(tile.id)
@@ -856,6 +938,7 @@ private fun TileItem(
         enabled = enabled,
         icon = spec.iconRes,
         onClick = {
+            onBounce()
             when (tile.id) {
                 PanelTileId.FPS -> actions.onToggleFps()
                 PanelTileId.GESTURES -> actions.onToggleGestures()
@@ -912,6 +995,11 @@ private fun TilePageIndicator(
 
 private const val TILES_PER_PAGE = 4
 private val TILE_HEIGHT = 66.dp
+private val TILE_BOUNCE = 8.dp
+private val GRID_GAP = 8.dp
+private const val ICON_POP_SCALE = 1.12f
+private const val BOUNCE_OUT_MS = 70
+private const val BOUNCE_BACK_MS = 90
 
 @Composable
 internal fun PanelTile(
@@ -923,6 +1011,18 @@ internal fun PanelTile(
     interactive: Boolean = true,
     statusText: String? = null,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val iconPop = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
+    val iconModifier = Modifier
+        .size(22.dp)
+        .graphicsLayer {
+            scaleX = iconPop.value
+            scaleY = iconPop.value
+            transformOrigin = TransformOrigin.Center
+        }
+
     val background = if (enabled) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -934,22 +1034,40 @@ internal fun PanelTile(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Surface(
+    Box(
         modifier = modifier
-            .height(66.dp)
+            .height(TILE_HEIGHT)
             .clip(RoundedCornerShape(18.dp))
-            .then(if (interactive) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(18.dp),
-        color = background,
+            .background(background)
+            .then(
+                if (interactive) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = ripple(bounded = true),
+                        onClick = {
+                            scope.launch {
+                                iconPop.snapTo(1f)
+                                iconPop.animateTo(ICON_POP_SCALE, tween(90))
+                                iconPop.animateTo(1f, tween(170))
+                            }
+                            onClick()
+                        },
+                    )
+                } else {
+                    Modifier
+                }
+            ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
-                modifier = Modifier.size(22.dp),
+                modifier = iconModifier,
                 tint = foreground,
             )
             Spacer(Modifier.width(8.dp))

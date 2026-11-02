@@ -53,7 +53,7 @@
     <string name="panel_tile_ringer">Ringer</string>
     <string name="panel_tile_dnd">Do Not Disturb</string>
     <string name="panel_tile_auto_brightness">Auto-brightness</string>
-    <string name="panel_tile_rotation_lock">Rotation lock</string>
+    <string name="panel_tile_rotation_lock">Auto-rotate</string>
     <string name="panel_tile_on">On</string>
     <string name="panel_tile_off">Off</string>
     <string name="panel_tile_ringer_normal">Normal</string>

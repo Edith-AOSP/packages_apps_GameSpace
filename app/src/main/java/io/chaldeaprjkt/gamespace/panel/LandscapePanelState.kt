@@ -37,7 +37,7 @@ data class LandscapePanelState(
         PanelTileId.RINGER -> ringerMode != AudioManager.RINGER_MODE_NORMAL
         PanelTileId.DND -> dnd
         PanelTileId.AUTO_BRIGHTNESS -> autoBrightness
-        PanelTileId.ROTATION_LOCK -> rotationLocked
+        PanelTileId.ROTATION_LOCK -> !rotationLocked
     }
 }
 
