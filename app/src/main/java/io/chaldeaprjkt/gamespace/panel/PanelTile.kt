@@ -20,7 +20,11 @@ enum class PanelTileId(val key: String) {
     FPS("fps"),
     GESTURES("gestures"),
     STAY_AWAKE("stay_awake"),
-    HEADS_UP("heads_up");
+    HEADS_UP("heads_up"),
+    RINGER("ringer"),
+    DND("dnd"),
+    AUTO_BRIGHTNESS("auto_brightness"),
+    ROTATION_LOCK("rotation_lock");
 
     companion object {
         fun fromKey(key: String): PanelTileId? = values().firstOrNull { it.key == key }
@@ -31,6 +35,7 @@ data class PanelTileSpec(
     val id: PanelTileId,
     @StringRes val titleRes: Int,
     @DrawableRes val iconRes: Int,
+    val defaultVisible: Boolean = true,
 )
 
 data class PanelTileConfig(
@@ -52,11 +57,36 @@ object PanelTiles {
             R.string.panel_tile_heads_up,
             R.drawable.ic_action_heads_up,
         ),
+        PanelTileSpec(
+            PanelTileId.RINGER,
+            R.string.panel_tile_ringer,
+            R.drawable.ic_ringer,
+            defaultVisible = false,
+        ),
+        PanelTileSpec(
+            PanelTileId.DND,
+            R.string.panel_tile_dnd,
+            R.drawable.ic_dnd,
+            defaultVisible = false,
+        ),
+        PanelTileSpec(
+            PanelTileId.AUTO_BRIGHTNESS,
+            R.string.panel_tile_auto_brightness,
+            R.drawable.ic_auto_brightness,
+            defaultVisible = false,
+        ),
+        PanelTileSpec(
+            PanelTileId.ROTATION_LOCK,
+            R.string.panel_tile_rotation_lock,
+            R.drawable.ic_rotation_lock,
+            defaultVisible = false,
+        ),
     )
 
     fun spec(id: PanelTileId): PanelTileSpec = specs.first { it.id == id }
 
-    fun defaults(): List<PanelTileConfig> = specs.map { PanelTileConfig(it.id, visible = true) }
+    fun defaults(): List<PanelTileConfig> =
+        specs.map { PanelTileConfig(it.id, visible = it.defaultVisible) }
 
     fun visible(config: List<PanelTileConfig>): List<PanelTileConfig> =
         config.filter { it.visible }

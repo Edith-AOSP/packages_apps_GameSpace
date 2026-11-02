@@ -58,6 +58,23 @@ class SystemSettings @Inject constructor(
             )
         }
 
+    var rotationLocked
+        get() =
+            Settings.System.getIntForUser(
+                resolver,
+                Settings.System.ACCELEROMETER_ROTATION,
+                1,
+                UserHandle.USER_CURRENT
+            ) == 0
+        set(locked) {
+            Settings.System.putIntForUser(
+                resolver,
+                Settings.System.ACCELEROMETER_ROTATION,
+                if (locked) 0 else 1,
+                UserHandle.USER_CURRENT
+            )
+        }
+
     var threeScreenshot
         get() = Settings.System.getIntForUser(
             resolver, Settings.System.THREE_FINGER_GESTURE, 0,

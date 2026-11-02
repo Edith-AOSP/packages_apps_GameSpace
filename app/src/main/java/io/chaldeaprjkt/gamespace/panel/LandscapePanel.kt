@@ -17,6 +17,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Build
 import android.view.View
@@ -760,9 +761,24 @@ private fun TileGrid(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     rowTiles.forEach { tile ->
                         val spec = PanelTiles.spec(tile.id)
+                        val enabled = state.isTileEnabled(tile.id)
+                        val statusText = when (tile.id) {
+                            PanelTileId.RINGER -> stringResource(
+                                when (state.ringerMode) {
+                                    AudioManager.RINGER_MODE_SILENT ->
+                                        R.string.panel_tile_ringer_silent
+                                    AudioManager.RINGER_MODE_VIBRATE ->
+                                        R.string.panel_tile_ringer_vibrate
+                                    else -> R.string.panel_tile_ringer_normal
+                                }
+                            )
+                            else -> stringResource(
+                                if (enabled) R.string.panel_tile_on else R.string.panel_tile_off
+                            )
+                        }
                         PanelTile(
                             title = stringResource(spec.titleRes),
-                            enabled = state.isTileEnabled(tile.id),
+                            enabled = enabled,
                             icon = spec.iconRes,
                             onClick = {
                                 when (tile.id) {
@@ -770,9 +786,16 @@ private fun TileGrid(
                                     PanelTileId.GESTURES -> actions.onToggleGestures()
                                     PanelTileId.STAY_AWAKE -> actions.onToggleStayAwake()
                                     PanelTileId.HEADS_UP -> actions.onToggleHeadsUp()
+                                    PanelTileId.RINGER -> actions.onCycleRinger()
+                                    PanelTileId.DND -> actions.onToggleDnd()
+                                    PanelTileId.AUTO_BRIGHTNESS ->
+                                        actions.onToggleAutoBrightness()
+                                    PanelTileId.ROTATION_LOCK ->
+                                        actions.onToggleRotationLock()
                                 }
                             },
                             modifier = Modifier.weight(1f),
+                            statusText = statusText,
                         )
                     }
                     if (rowTiles.size == 1) {

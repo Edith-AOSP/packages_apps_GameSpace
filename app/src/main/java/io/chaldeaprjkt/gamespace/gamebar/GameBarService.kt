@@ -26,10 +26,12 @@ import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Point
+import android.media.AudioManager
 import android.os.Binder
 import android.os.Handler
 import android.os.Looper
 import android.os.RemoteException
+import android.provider.Settings
 import android.util.Log
 import android.view.*
 import android.widget.FrameLayout
@@ -77,6 +79,10 @@ class GameBarService : Hilt_GameBarService() {
     private val wm by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val handler by lazy { Handler(Looper.getMainLooper()) }
     private val inflater by lazy { LayoutInflater.from(this) }
+    private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
+    private val notificationManager by lazy {
+        getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+    }
 
     private var halfWidth = 0
     private var safeHeight = 0
@@ -456,6 +462,11 @@ class GameBarService : Hilt_GameBarService() {
         )
     }
 
+    private fun isDndEnabled(): Boolean =
+        notificationManager.isNotificationPolicyAccessGranted &&
+            notificationManager.currentInterruptionFilter !=
+            NotificationManager.INTERRUPTION_FILTER_ALL
+
     private fun landscapeActions() = LandscapePanelActions(
         onDismiss = { showPanel = false },
         onToggleFps = {
@@ -478,6 +489,45 @@ class GameBarService : Hilt_GameBarService() {
             val enabled = !appSettings.danmakuNotification
             appSettings.danmakuNotification = enabled
             systemSettings.headsup = !enabled
+            refreshLandscapeState()
+        },
+        onCycleRinger = {
+            val next = when (audioManager.ringerModeInternal) {
+                AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                else -> AudioManager.RINGER_MODE_NORMAL
+            }
+            runCatching { audioManager.ringerModeInternal = next }
+            refreshLandscapeState()
+        },
+        onToggleDnd = {
+            if (notificationManager.isNotificationPolicyAccessGranted) {
+                val enabled = !isDndEnabled()
+                runCatching {
+                    notificationManager.setInterruptionFilter(
+                        if (enabled) {
+                            NotificationManager.INTERRUPTION_FILTER_PRIORITY
+                        } else {
+                            NotificationManager.INTERRUPTION_FILTER_ALL
+                        }
+                    )
+                }
+            } else {
+                runCatching {
+                    startActivity(
+                        Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+            refreshLandscapeState()
+        },
+        onToggleAutoBrightness = {
+            runCatching { systemSettings.autoBrightness = !systemSettings.autoBrightness }
+            refreshLandscapeState()
+        },
+        onToggleRotationLock = {
+            runCatching { systemSettings.rotationLocked = !systemSettings.rotationLocked }
             refreshLandscapeState()
         },
         onSetMode = { mode ->
@@ -515,6 +565,10 @@ class GameBarService : Hilt_GameBarService() {
             gestures = !appSettings.noThreeScreenshot,
             stayAwake = appSettings.stayAwake,
             headsUp = !appSettings.danmakuNotification,
+            ringerMode = audioManager.ringerModeInternal,
+            dnd = isDndEnabled(),
+            autoBrightness = systemSettings.autoBrightness,
+            rotationLocked = systemSettings.rotationLocked,
             tiles = PanelTiles.decode(appSettings.panelTiles),
         )
     }

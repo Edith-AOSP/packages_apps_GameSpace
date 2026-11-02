@@ -12,6 +12,7 @@ package io.chaldeaprjkt.gamespace.panel
 
 import android.app.GameManager
 import android.graphics.drawable.Drawable
+import android.media.AudioManager
 
 data class LandscapePanelState(
     val gameLabel: String = "",
@@ -22,6 +23,10 @@ data class LandscapePanelState(
     val gestures: Boolean = true,
     val stayAwake: Boolean = false,
     val headsUp: Boolean = true,
+    val ringerMode: Int = AudioManager.RINGER_MODE_NORMAL,
+    val dnd: Boolean = false,
+    val autoBrightness: Boolean = true,
+    val rotationLocked: Boolean = false,
     val tiles: List<PanelTileConfig> = PanelTiles.defaults(),
 ) {
     fun isTileEnabled(id: PanelTileId): Boolean = when (id) {
@@ -29,6 +34,10 @@ data class LandscapePanelState(
         PanelTileId.GESTURES -> gestures
         PanelTileId.STAY_AWAKE -> stayAwake
         PanelTileId.HEADS_UP -> headsUp
+        PanelTileId.RINGER -> ringerMode != AudioManager.RINGER_MODE_NORMAL
+        PanelTileId.DND -> dnd
+        PanelTileId.AUTO_BRIGHTNESS -> autoBrightness
+        PanelTileId.ROTATION_LOCK -> rotationLocked
     }
 }
 
@@ -49,6 +58,10 @@ data class LandscapePanelActions(
     val onToggleGestures: () -> Unit,
     val onToggleStayAwake: () -> Unit,
     val onToggleHeadsUp: () -> Unit,
+    val onCycleRinger: () -> Unit,
+    val onToggleDnd: () -> Unit,
+    val onToggleAutoBrightness: () -> Unit,
+    val onToggleRotationLock: () -> Unit,
     val onSetMode: (Int) -> Unit,
     val onPanelTilesChanged: (List<PanelTileConfig>) -> Unit,
 )
