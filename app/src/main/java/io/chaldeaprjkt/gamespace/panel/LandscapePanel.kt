@@ -51,6 +51,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -450,7 +452,9 @@ private fun GameStrip(
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = state.gameLabel.ifBlank { "Game" },
+                    text = state.gameLabel.ifBlank {
+                        stringResource(R.string.panel_game_fallback)
+                    },
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -458,7 +462,10 @@ private fun GameStrip(
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
                 Text(
-                    text = "${formatElapsed(elapsed)} Elapsed",
+                    text = stringResource(
+                        R.string.panel_elapsed,
+                        formatElapsed(elapsed),
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f),
                 )
@@ -589,13 +596,23 @@ private fun ModeSelector(
     onSetMode: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tabs = remember {
-        listOf(
-            ModeTab(GameManager.GAME_MODE_BATTERY, null, "Battery"),
-            ModeTab(GameManager.GAME_MODE_STANDARD, R.drawable.ic_bar_chart, "Balanced"),
-            ModeTab(GameManager.GAME_MODE_PERFORMANCE, R.drawable.ic_speed, "Performance"),
-        )
-    }
+    val tabs = listOf(
+        ModeTab(
+            GameManager.GAME_MODE_BATTERY,
+            null,
+            stringResource(R.string.panel_mode_battery),
+        ),
+        ModeTab(
+            GameManager.GAME_MODE_STANDARD,
+            R.drawable.ic_bar_chart,
+            stringResource(R.string.panel_mode_balanced),
+        ),
+        ModeTab(
+            GameManager.GAME_MODE_PERFORMANCE,
+            R.drawable.ic_speed,
+            stringResource(R.string.panel_mode_performance),
+        ),
+    )
 
     val selectedIndex = tabs.indexOfFirst { it.mode == mode }.coerceAtLeast(0)
     val indicatorOffset by animateDpAsState(
@@ -749,63 +766,152 @@ private fun TileGrid(
     modifier: Modifier = Modifier,
 ) {
     val tiles = state.tiles.filter { it.visible }
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (tiles.isEmpty()) {
-            Text(
-                text = stringResource(R.string.panel_tiles_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            tiles.chunked(2).forEach { rowTiles ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowTiles.forEach { tile ->
-                        val spec = PanelTiles.spec(tile.id)
-                        val enabled = state.isTileEnabled(tile.id)
-                        val statusText = when (tile.id) {
-                            PanelTileId.RINGER -> stringResource(
-                                when (state.ringerMode) {
-                                    AudioManager.RINGER_MODE_SILENT ->
-                                        R.string.panel_tile_ringer_silent
-                                    AudioManager.RINGER_MODE_VIBRATE ->
-                                        R.string.panel_tile_ringer_vibrate
-                                    else -> R.string.panel_tile_ringer_normal
-                                }
-                            )
-                            else -> stringResource(
-                                if (enabled) R.string.panel_tile_on else R.string.panel_tile_off
+    val pages = remember(tiles) { tiles.chunked(TILES_PER_PAGE) }
+
+    if (tiles.isEmpty()) {
+        Text(
+            text = stringResource(R.string.panel_tiles_empty),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier,
+        )
+        return
+    }
+
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+    LaunchedEffect(pages.size) {
+        if (pages.isNotEmpty() && pagerState.currentPage > pages.lastIndex) {
+            pagerState.scrollToPage(pages.lastIndex)
+        }
+    }
+    val rowGap = 8.dp
+    val gridHeight = TILE_HEIGHT * 2 + rowGap
+
+    Column(modifier = modifier) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(gridHeight),
+            pageSpacing = 12.dp,
+            beyondViewportPageCount = 1,
+        ) { page ->
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(rowGap),
+            ) {
+                pages[page].chunked(2).forEach { rowTiles ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowTiles.forEach { tile ->
+                            TileItem(
+                                tile = tile,
+                                state = state,
+                                actions = actions,
+                                modifier = Modifier.weight(1f),
                             )
                         }
-                        PanelTile(
-                            title = stringResource(spec.titleRes),
-                            enabled = enabled,
-                            icon = spec.iconRes,
-                            onClick = {
-                                when (tile.id) {
-                                    PanelTileId.FPS -> actions.onToggleFps()
-                                    PanelTileId.GESTURES -> actions.onToggleGestures()
-                                    PanelTileId.STAY_AWAKE -> actions.onToggleStayAwake()
-                                    PanelTileId.HEADS_UP -> actions.onToggleHeadsUp()
-                                    PanelTileId.RINGER -> actions.onCycleRinger()
-                                    PanelTileId.DND -> actions.onToggleDnd()
-                                    PanelTileId.AUTO_BRIGHTNESS ->
-                                        actions.onToggleAutoBrightness()
-                                    PanelTileId.ROTATION_LOCK ->
-                                        actions.onToggleRotationLock()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            statusText = statusText,
-                        )
-                    }
-                    if (rowTiles.size == 1) {
-                        Spacer(Modifier.weight(1f))
+                        if (rowTiles.size == 1) {
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
             }
         }
+
+        if (pages.size > 1) {
+            TilePageIndicator(
+                pageCount = pages.size,
+                currentPage = pagerState.currentPage,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+            )
+        }
     }
 }
+
+@Composable
+private fun TileItem(
+    tile: PanelTileConfig,
+    state: LandscapePanelState,
+    actions: LandscapePanelActions,
+    modifier: Modifier = Modifier,
+) {
+    val spec = PanelTiles.spec(tile.id)
+    val enabled = state.isTileEnabled(tile.id)
+    val statusText = when (tile.id) {
+        PanelTileId.RINGER -> stringResource(
+            when (state.ringerMode) {
+                AudioManager.RINGER_MODE_SILENT -> R.string.panel_tile_ringer_silent
+                AudioManager.RINGER_MODE_VIBRATE -> R.string.panel_tile_ringer_vibrate
+                else -> R.string.panel_tile_ringer_normal
+            }
+        )
+        else -> stringResource(
+            if (enabled) R.string.panel_tile_on else R.string.panel_tile_off
+        )
+    }
+    PanelTile(
+        title = stringResource(spec.titleRes),
+        enabled = enabled,
+        icon = spec.iconRes,
+        onClick = {
+            when (tile.id) {
+                PanelTileId.FPS -> actions.onToggleFps()
+                PanelTileId.GESTURES -> actions.onToggleGestures()
+                PanelTileId.STAY_AWAKE -> actions.onToggleStayAwake()
+                PanelTileId.HEADS_UP -> actions.onToggleHeadsUp()
+                PanelTileId.RINGER -> actions.onCycleRinger()
+                PanelTileId.DND -> actions.onToggleDnd()
+                PanelTileId.AUTO_BRIGHTNESS -> actions.onToggleAutoBrightness()
+                PanelTileId.ROTATION_LOCK -> actions.onToggleRotationLock()
+            }
+        },
+        modifier = modifier,
+        statusText = statusText,
+    )
+}
+
+@Composable
+private fun TilePageIndicator(
+    pageCount: Int,
+    currentPage: Int,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(pageCount) { index ->
+            val selected = index == currentPage
+            val width by animateDpAsState(
+                targetValue = if (selected) 16.dp else 6.dp,
+                animationSpec = tween(220),
+                label = "tilePageWidth",
+            )
+            val color by animateColorAsState(
+                targetValue = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                },
+                animationSpec = tween(220),
+                label = "tilePageColor",
+            )
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 3.dp)
+                    .size(width = width, height = 6.dp)
+                    .clip(CircleShape)
+                    .background(color),
+            )
+        }
+    }
+}
+
+private const val TILES_PER_PAGE = 4
+private val TILE_HEIGHT = 66.dp
 
 @Composable
 internal fun PanelTile(
@@ -815,7 +921,7 @@ internal fun PanelTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
-    statusText: String? = if (enabled) "On" else "Off",
+    statusText: String? = null,
 ) {
     val background = if (enabled) {
         MaterialTheme.colorScheme.primary

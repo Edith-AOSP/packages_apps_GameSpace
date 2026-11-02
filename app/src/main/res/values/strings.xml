@@ -59,6 +59,12 @@
     <string name="panel_tile_ringer_normal">Normal</string>
     <string name="panel_tile_ringer_vibrate">Vibrate</string>
     <string name="panel_tile_ringer_silent">Silent</string>
+    <string name="panel_game_fallback">Game</string>
+    <string name="panel_elapsed">%1$s Elapsed</string>
+    <string name="panel_mode_battery">Battery</string>
+    <string name="panel_mode_balanced">Balanced</string>
+    <string name="panel_mode_performance">Performance</string>
+    <string name="gamespace_service_channel_name">Game Space Service</string>
     <string name="panel_tiles_customize">Customize panel tiles</string>
     <string name="panel_tiles_done">Done</string>
     <string name="panel_tiles_active">Active</string>

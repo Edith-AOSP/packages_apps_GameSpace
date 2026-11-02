@@ -219,7 +219,11 @@ class GameBarService : Hilt_GameBarService() {
     private fun startForegroundService() {
         val channelId = "gamespace_service_channel"
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(channelId, "Game Space Service", NotificationManager.IMPORTANCE_HIGH).apply {
+        val channel = NotificationChannel(
+            channelId,
+            getString(R.string.gamespace_service_channel_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
             setSound(null, null)
             enableVibration(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
@@ -550,7 +554,7 @@ class GameBarService : Hilt_GameBarService() {
 
     private fun refreshLandscapeState() {
         val packageName = gameSession.activePackage
-        val label = packageName?.let(::gameLabel) ?: "Game"
+        val label = packageName?.let(::gameLabel) ?: getString(R.string.panel_game_fallback)
         val icon = packageName?.let(::gameIcon)
         val mode = packageName?.let {
             systemSettings.userGames.firstOrNull { game -> game.packageName == it }?.mode

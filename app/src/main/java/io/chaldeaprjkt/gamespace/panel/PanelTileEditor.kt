@@ -10,9 +10,12 @@
 
 package io.chaldeaprjkt.gamespace.panel
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -174,6 +178,15 @@ internal fun PanelTileEditor(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = { showResetDialog = true }) {
+                        Text(stringResource(R.string.panel_tiles_reset))
+                    }
+                }
+
                 EditorSection(
                     title = stringResource(R.string.panel_tiles_active),
                     tiles = tiles.filter { it.visible },
@@ -232,38 +245,6 @@ internal fun PanelTileEditor(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-
-                if (showResetDialog) {
-                    Text(
-                        text = stringResource(R.string.panel_tiles_reset_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stringResource(R.string.panel_tiles_reset_message),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { showResetDialog = false }) {
-                            Text(stringResource(R.string.panel_tiles_cancel))
-                        }
-                        TextButton(
-                            onClick = {
-                                tiles.clear()
-                                tiles.addAll(PanelTiles.defaults())
-                                persist()
-                                showResetDialog = false
-                            },
-                        ) {
-                            Text(stringResource(R.string.panel_tiles_reset_confirm))
-                        }
-                    }
-                } else {
-                    TextButton(onClick = { showResetDialog = true }) {
-                        Text(stringResource(R.string.panel_tiles_reset))
-                    }
-                }
             }
 
             val ghostId = draggingId
@@ -289,6 +270,66 @@ internal fun PanelTileEditor(
                         interactive = false,
                         statusText = null,
                     )
+                }
+            }
+
+            if (showResetDialog) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { showResetDialog = false },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.panel_tiles_reset_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = stringResource(R.string.panel_tiles_reset_message),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = { showResetDialog = false }) {
+                                    Text(stringResource(R.string.panel_tiles_cancel))
+                                }
+                                TextButton(
+                                    onClick = {
+                                        tiles.clear()
+                                        tiles.addAll(PanelTiles.defaults())
+                                        persist()
+                                        showResetDialog = false
+                                    },
+                                ) {
+                                    Text(stringResource(R.string.panel_tiles_reset_confirm))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
