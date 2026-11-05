@@ -1,18 +1,13 @@
 /*
- * Copyright (C) 2021 Chaldeaprjkt
+ * Copyright (C) 2026 The Edith AOSP Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
+
 package io.chaldeaprjkt.gamespace.preferences.appselector
 
 import android.app.Activity
@@ -31,21 +26,36 @@ import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.AppBarLayout
 import dagger.hilt.android.AndroidEntryPoint
 import io.chaldeaprjkt.gamespace.R
 import io.chaldeaprjkt.gamespace.data.SystemSettings
-import io.chaldeaprjkt.gamespace.preferences.AppListPreferences
+import io.chaldeaprjkt.gamespace.discord.MediaApp
+import io.chaldeaprjkt.gamespace.discord.MediaAppRepository
+import io.chaldeaprjkt.gamespace.preferences.MediaAppListPreferences
 import io.chaldeaprjkt.gamespace.preferences.appselector.adapter.AppsAdapter
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+/**
+ * Picks an app for the list the caller asked for.
+ *
+ * The game list offers every installed user app; the media list offers the apps that can hold a
+ * media session and are not already selected.
+ */
 @AndroidEntryPoint(Fragment::class)
 class AppSelectorFragment : Hilt_AppSelectorFragment(), SearchView.OnQueryTextListener,
     MenuItem.OnActionExpandListener {
     @Inject
     lateinit var settings: SystemSettings
+
+    @Inject
+    lateinit var mediaApps: MediaAppRepository
 
     private var appListView: RecyclerView? = null
     private var appsAdapter: AppsAdapter? = null
@@ -63,6 +73,9 @@ class AppSelectorFragment : Hilt_AppSelectorFragment(), SearchView.OnQueryTextLi
 
         override fun onMenuItemSelected(menuItem: MenuItem) = false
     }
+
+    private val forMedia: Boolean
+        get() = requireArguments().getBoolean(ARG_MEDIA)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -84,25 +97,58 @@ class AppSelectorFragment : Hilt_AppSelectorFragment(), SearchView.OnQueryTextLi
 
     private fun setupAppListView(view: RecyclerView) {
         appListView = view
+        view.layoutManager = LinearLayoutManager(view.context)
+
+        if (forMedia) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val pm = requireContext().packageManager
+                val selected = mediaApps.selected()
+                val apps = withContext(Dispatchers.IO) {
+                    mediaApps.candidates()
+                        .filter { it.packageName !in selected }
+                        .map { it.toApplicationInfo(pm) }
+                        .filterNotNull()
+                }
+                appsAdapter = AppsAdapter(pm, apps)
+                view.adapter = appsAdapter
+                appsAdapter?.onItemClick(::finishWith)
+            }
+            return
+        }
+
         val flags = PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong())
         val apps = view.context.packageManager
             .getInstalledApplications(flags)
             .filter {
                 it.packageName != context?.packageName &&
-                        it.flags and ApplicationInfo.FLAG_SYSTEM == 0 &&
-                        !settings.userGames.any { t -> t.packageName == it.packageName }
+                    it.flags and ApplicationInfo.FLAG_SYSTEM == 0 &&
+                    !settings.userGames.any { game -> game.packageName == it.packageName }
             }
             .sortedBy { it.loadLabel(view.context.packageManager).toString().lowercase() }
 
         appsAdapter = AppsAdapter(view.context.packageManager, apps)
         view.adapter = appsAdapter
-        view.layoutManager = LinearLayoutManager(view.context)
-        appsAdapter?.onItemClick {
-            activity?.setResult(Activity.RESULT_OK, Intent().apply {
-                putExtra(AppListPreferences.EXTRA_APP, it.packageName)
-            })
-            activity?.finish()
-        }
+        appsAdapter?.onItemClick(::finishWith)
+    }
+
+    private fun finishWith(info: ApplicationInfo) {
+        activity?.setResult(Activity.RESULT_OK, Intent().apply {
+            putExtra(
+                if (forMedia) MediaAppListPreferences.EXTRA_MEDIA_APP
+                else io.chaldeaprjkt.gamespace.preferences.AppListPreferences.EXTRA_APP,
+                info.packageName,
+            )
+        })
+        activity?.finish()
+    }
+
+    private fun MediaApp.toApplicationInfo(pm: PackageManager): ApplicationInfo? = try {
+        pm.getApplicationInfo(
+            packageName,
+            PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
+        )
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
     }
 
     override fun onQueryTextSubmit(query: String?) = false
@@ -122,5 +168,9 @@ class AppSelectorFragment : Hilt_AppSelectorFragment(), SearchView.OnQueryTextLi
         appBarLayout?.setExpanded(false, false)
         appListView?.let { ViewCompat.setNestedScrollingEnabled(it, true) }
         return true
+    }
+
+    companion object {
+        const val ARG_MEDIA = "media_app_selector"
     }
 }

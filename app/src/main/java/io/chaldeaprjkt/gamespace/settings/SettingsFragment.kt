@@ -105,7 +105,7 @@ class SettingsFragment : Hilt_SettingsFragment() {
                 }
                 preference.setOnPreferenceChangeListener { _, newValue ->
                     if (newValue == false) {
-                        discordPresence.stopGame(immediate = true)
+                        discordPresence.stopGame()
                     } else {
                         discordPresence.restart()
                     }

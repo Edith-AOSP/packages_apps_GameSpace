@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <com.android.settingslib.widget.MainSwitchPreference
+        android:defaultValue="false"
+        android:key="gamespace_discord_media"
+        android:persistent="false"
+        android:title="@string/discord_media_title" />
+
+    <Preference
+        android:icon="@drawable/ic_add"
+        android:key="discord_media_add_app"
+        android:persistent="false"
+        android:title="@string/discord_media_add" />
+
+    <io.chaldeaprjkt.gamespace.preferences.MediaAppListPreferences
+        android:key="gamespace_discord_media_list"
+        android:title="@string/discord_media_list_title" />
+</PreferenceScreen>

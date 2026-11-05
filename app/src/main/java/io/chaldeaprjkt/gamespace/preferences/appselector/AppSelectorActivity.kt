@@ -26,8 +26,25 @@ class AppSelectorActivity : Hilt_AppSelectorActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(com.android.settingslib.collapsingtoolbar.R.id.content_frame, AppSelectorFragment())
+                .replace(
+                    com.android.settingslib.collapsingtoolbar.R.id.content_frame,
+                    AppSelectorFragment().apply {
+                        arguments = Bundle().apply {
+                            putBoolean(
+                                AppSelectorFragment.ARG_MEDIA,
+                                intent.getBooleanExtra(AppSelectorFragment.ARG_MEDIA, false),
+                            )
+                        }
+                    },
+                )
                 .commit()
         }
+        title = getString(
+            if (intent.getBooleanExtra(AppSelectorFragment.ARG_MEDIA, false)) {
+                io.chaldeaprjkt.gamespace.R.string.app_selector_media_label
+            } else {
+                io.chaldeaprjkt.gamespace.R.string.app_selector_label
+            },
+        )
     }
 }

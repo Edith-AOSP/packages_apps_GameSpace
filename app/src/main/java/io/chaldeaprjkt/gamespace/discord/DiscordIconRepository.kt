@@ -23,6 +23,12 @@ import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Resolves a game's Discord large-image key from the icon manifest.
+ *
+ * The manifest is fetched once and cached for 12 hours. See the icon manifest section of
+ * `docs/gamespace-discord-rpc.md`.
+ */
 @Singleton
 class DiscordIconRepository @Inject constructor(
     @ApplicationContext private val context: Context,

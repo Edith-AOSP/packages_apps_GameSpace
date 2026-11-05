@@ -20,6 +20,8 @@
     android:sharedUserId="android.uid.system">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
     <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
     <uses-permission android:name="android.permission.GET_TASKS" />
     <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS" />
@@ -78,11 +80,20 @@
             android:excludeFromRecents="true" />
 
         <activity
-            android:name=".discord.DiscordContextActivity"
-            android:theme="@android:style/Theme.NoDisplay"
+            android:name=".settings.DiscordMediaActivity"
             android:exported="false"
             android:excludeFromRecents="true"
-            android:noHistory="true" />
+            android:label="@string/discord_media_title" />
+
+        <activity
+            android:name=".discord.DiscordContextActivity"
+            android:theme="@style/GameSpaceTheme.DiscordHost"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:configChanges="mcc|mnc|locale|layoutDirection|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|density|uiMode|fontScale|colorMode"
+            android:noHistory="false" />
 
         <service
             android:name=".gamebar.SessionService"
@@ -109,6 +120,15 @@
             <intent-filter>
                 <action android:name="io.chaldeaprjkt.gamespace.action.GAME_START" />
                 <action android:name="io.chaldeaprjkt.gamespace.action.GAME_STOP" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".gamebar.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>

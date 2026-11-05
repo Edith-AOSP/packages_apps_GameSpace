@@ -38,4 +38,22 @@
         <item name="android:textColor">@color/tile_title_color</item>
     </style>
 
+    <!--
+        Host for the Discord SDK's Activity. It must stay alive, so it is made invisible and
+        zero-sized instead of finishing: a finished Activity gives the SDK a null context.
+    -->
+    <style name="GameSpaceTheme.DiscordHost" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowNoDisplay">false</item>
+        <item name="android:windowMinWidthMajor">0%</item>
+        <item name="android:windowMinWidthMinor">0%</item>
+    </style>
+
 </resources>

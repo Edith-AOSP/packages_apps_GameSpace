@@ -1,4 +1,9 @@
-# The Social SDK resolves these classes from native code by name.
--keep class com.discord.socialsdk.** { *; }
--keep class com.discord.org.webrtc.** { *; }
--dontwarn com.discord.**
+# The Discord Social SDK (and the webrtc build it embeds) looks its own classes, fields and
+# methods up from native code by name. R8 cannot see any of that, so without these rules it
+# strips the classes and JNI_OnLoad aborts in GetMethodID on first use.
+-keep class com.discord.** { *; }
+-keep interface com.discord.** { *; }
+
+# The presence result callback is also invoked from native code by name.
+-keep interface io.chaldeaprjkt.gamespace.discord.DiscordNative$ResultListener { *; }
+-keep class * implements io.chaldeaprjkt.gamespace.discord.DiscordNative$ResultListener { *; }

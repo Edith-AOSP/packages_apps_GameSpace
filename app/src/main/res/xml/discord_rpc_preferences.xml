@@ -3,7 +3,16 @@
     <com.android.settingslib.widget.MainSwitchPreference
         android:defaultValue="false"
         android:key="gamespace_discord_rpc"
+        android:persistent="false"
         android:title="@string/discord_rpc_title" />
+
+    <com.android.settingslib.PrimarySwitchPreference
+        android:defaultValue="false"
+        android:dependency="gamespace_discord_rpc"
+        android:key="gamespace_discord_media"
+        android:persistent="false"
+        android:summary="@string/discord_media_summary"
+        android:title="@string/discord_media_title" />
 
     <Preference
         android:key="discord_application_id"

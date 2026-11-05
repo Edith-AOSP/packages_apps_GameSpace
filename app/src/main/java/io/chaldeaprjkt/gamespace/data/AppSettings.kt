@@ -78,6 +78,23 @@ class AppSettings @Inject constructor(private val context: Context) {
         get() = db.getBoolean(KEY_DISCORD_RPC, false)
         set(value) = db.edit().putBoolean(KEY_DISCORD_RPC, value).apply()
 
+    var discordMedia
+        get() = db.getBoolean(KEY_DISCORD_MEDIA, false)
+        set(value) = db.edit().putBoolean(KEY_DISCORD_MEDIA, value).apply()
+
+    /**
+     * Packages whose media sessions are mirrored to Discord.
+     *
+     * `null` means the user has not chosen yet, which every installed media app qualifies for;
+     * an empty set means the user deselected all of them.
+     */
+    var discordMediaPackages: Set<String>?
+        get() = db.getStringSet(KEY_DISCORD_MEDIA_PACKAGES, null)
+        set(value) = db.edit().apply {
+            if (value == null) remove(KEY_DISCORD_MEDIA_PACKAGES)
+            else putStringSet(KEY_DISCORD_MEDIA_PACKAGES, value)
+        }.apply()
+
     var panelTiles
         get() = db.getString(KEY_PANEL_TILES, "").orEmpty()
         set(value) = db.edit().putString(KEY_PANEL_TILES, value).apply()
@@ -92,6 +109,9 @@ class AppSettings @Inject constructor(private val context: Context) {
         const val KEY_LOCK_GESTURE = "gamespace_lock_gesture"
         const val KEY_MENU_OPACITY = "gamespace_menu_opacity"
         const val KEY_DISCORD_RPC = "gamespace_discord_rpc"
+        const val KEY_DISCORD_MEDIA = "gamespace_discord_media"
+        const val KEY_DISCORD_MEDIA_PACKAGES = "gamespace_discord_media_packages"
+        const val KEY_DISCORD_MEDIA_LIST = "gamespace_discord_media_list"
         const val KEY_PANEL_TILES = "gamespace_panel_tiles"
     }
 }

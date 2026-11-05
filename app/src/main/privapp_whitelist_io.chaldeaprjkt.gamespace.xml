@@ -17,6 +17,7 @@
 <permissions>
     <privapp-permissions package="io.chaldeaprjkt.gamespace">
         <permission name="android.permission.GET_TASKS" />
+        <permission name="android.permission.MEDIA_CONTENT_CONTROL" />
         <permission name="android.permission.INTERACT_ACROSS_USERS" />
         <permission name="android.permission.MANAGE_GAME_MODE" />
         <permission name="android.permission.SET_ORIENTATION" />

@@ -21,6 +21,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
@@ -52,6 +53,7 @@ import io.chaldeaprjkt.gamespace.data.AppSettings
 import io.chaldeaprjkt.gamespace.data.GameSession
 import io.chaldeaprjkt.gamespace.data.SystemSettings
 import io.chaldeaprjkt.gamespace.data.UserGame
+import io.chaldeaprjkt.gamespace.discord.DiscordPresenceManager
 import io.chaldeaprjkt.gamespace.panel.GameSpacePanelTheme
 import io.chaldeaprjkt.gamespace.panel.LandscapePanel
 import io.chaldeaprjkt.gamespace.panel.LandscapePanelActions
@@ -75,6 +77,7 @@ class GameBarService : Hilt_GameBarService() {
     @Inject lateinit var gameSession: GameSession
     @Inject lateinit var systemSettings: SystemSettings
     @Inject lateinit var gameModeUtils: GameModeUtils
+    @Inject lateinit var discordPresence: DiscordPresenceManager
 
     private val wm by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val handler by lazy { Handler(Looper.getMainLooper()) }
@@ -122,11 +125,17 @@ class GameBarService : Hilt_GameBarService() {
 
     private val binder = GameBarBinder()
     private val firstPaint = Runnable { initActions() }
+    private val releaseRunnable = Runnable {
+        if (!gameActive && !mediaActive) stopSelf()
+    }
     private var shouldClose = false
     private var isGameStarting = false
     private var isRecording = false
     private var panelOwner: ServiceComposeOwner? = null
     private var panelHideRunnable: Runnable? = null
+    private var mediaActive = false
+    private var gameActive = false
+    private var foreground = false
     private val landscapeState = MutableStateFlow(LandscapePanelState())
 
     private var barExpanded = false
@@ -189,6 +198,9 @@ class GameBarService : Hilt_GameBarService() {
 
     override fun onCreate() {
         super.onCreate()
+        // A previous process may have died before it could clear its presence; the stored id is
+        // the only ownership marker Discord gives us.
+        discordPresence.reconcileStalePresence()
         panelOwner = ServiceComposeOwner().apply {
             create()
             start()
@@ -216,38 +228,84 @@ class GameBarService : Hilt_GameBarService() {
         menuSwitcher.alpha = alphaValue
     }
 
-    private fun startForegroundService() {
-        val channelId = "gamespace_service_channel"
+    private fun startForegroundServiceNotification() {
+        val channelId = FOREGROUND_CHANNEL_ID
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        // IMPORTANCE_LOW keeps the ongoing notification quiet: no heads-up, no sound, no
+        // vibration. An earlier build used IMPORTANCE_HIGH, which made the service visibly pop.
         val channel = NotificationChannel(
             channelId,
             getString(R.string.gamespace_service_channel_name),
-            NotificationManager.IMPORTANCE_HIGH,
+            NotificationManager.IMPORTANCE_LOW,
         ).apply {
             setSound(null, null)
             enableVibration(false)
+            setShowBadge(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
+        if (manager.getNotificationChannel(LEGACY_CHANNEL_ID) != null) {
+            manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+        }
 
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle(getString(R.string.gamespace_running))
+        startForeground(1001, buildNotification(channelId), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+    }
+
+    /**
+     * Names what is running, so the ongoing row distinguishes the game bar from media presence.
+     *
+     * [ForegroundState.of] is derived from the two flags rather than tracked separately, so the
+     * text cannot drift from what the service is actually doing.
+     */
+    private fun buildNotification(channelId: String): Notification {
+        val state = ForegroundState.of(gameActive, mediaActive)
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setContentTitle(getString(state.title))
             .setSmallIcon(R.drawable.ic_gear)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
             .setSilent(true)
-            .build()
+        // The system shows this under the notification, and it is what used to read as the app
+        // name: the manifest label is the settings title, not the service.
+        builder.setContentText(getString(R.string.gamespace_running_summary))
+        return builder.build()
+    }
 
-        startForeground(1001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+    /** Repaints the ongoing notification after the running combination changes. */
+    private fun refreshForegroundNotification() {
+        if (!foreground) return
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(
+            FOREGROUND_NOTIFICATION_ID,
+            buildNotification(FOREGROUND_CHANNEL_ID),
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> onGameLeave()
             ACTION_START -> onGameStart()
+            ACTION_MEDIA_START -> startMediaPresence()
+            ACTION_MEDIA_STOP -> stopMediaPresence()
+            // A null action means the system recreated the service after the process died. The
+            // foreground notification is gone at that point, so it has to be restored here or
+            // the service is treated as a plain background service and killed again.
+            null -> restoreAfterRestart()
         }
         return START_STICKY
+    }
+
+    private fun restoreAfterRestart() {
+        if (appSettings.discordRpc && appSettings.discordMedia &&
+            DiscordPresenceManager.isSupported(this)
+        ) {
+            mediaActive = true
+            ensureForeground()
+            discordPresence.startMedia()
+        } else if (!gameActive) {
+            stopSelf()
+        }
     }
 
     override fun onBind(intent: Intent) = binder
@@ -309,13 +367,39 @@ class GameBarService : Hilt_GameBarService() {
             }
 
             shouldClose = false
+            gameActive = true
+            refreshForegroundNotification()
             rootBarView.isVisible = false
             rootBarView.alpha = 0f
             wm.addView(rootBarView, barLayoutParam)
             handler.postDelayed(firstPaint, 500)
-            startForegroundService()
+            ensureForeground()
             isGameStarting = false
         }
+    }
+
+    /**
+     * Starts media Rich Presence observation without showing the game bar.
+     *
+     * Both features share this service so there is a single ongoing notification and a single
+     * foreground lifetime to reason about.
+     */
+    fun startMediaPresence() {
+        if (mediaActive) return
+        if (!appSettings.discordRpc || !appSettings.discordMedia) return
+        if (!DiscordPresenceManager.isSupported(this)) return
+        mediaActive = true
+        ensureForeground()
+        refreshForegroundNotification()
+        discordPresence.startMedia()
+    }
+
+    fun stopMediaPresence() {
+        if (!mediaActive) return
+        mediaActive = false
+        discordPresence.stopMedia()
+        releaseIfIdle()
+        refreshForegroundNotification()
     }
 
     fun onGameLeave() {
@@ -334,8 +418,35 @@ class GameBarService : Hilt_GameBarService() {
             }
         }
 
-        stopForeground(true)
-        stopSelf()
+        gameActive = false
+        refreshForegroundNotification()
+        // Leaving the bar is the strongest signal that the game is over, so do not wait for the
+        // delayed grace period here.
+        discordPresence.stopGame()
+        releaseIfIdle()
+    }
+
+    /** Keeps the service foregrounded while either the game bar or media presence needs it. */
+    private fun ensureForeground() {
+        if (foreground) {
+            refreshForegroundNotification()
+            return
+        }
+        foreground = true
+        startForegroundServiceNotification()
+    }
+
+    private fun releaseIfIdle() {
+        if (gameActive || mediaActive) return
+        if (foreground) {
+            foreground = false
+            stopForeground(true)
+        }
+        // Discord is asked to clear the presence asynchronously. Tearing the process down in the
+        // same breath can drop that request, which is what left stale activities on the profile,
+        // so keep the service alive briefly and let the clear leave.
+        handler.removeCallbacks(releaseRunnable)
+        handler.postDelayed(releaseRunnable, RELEASE_FLUSH_MS)
     }
 
     private fun updateLayout(update: WindowManager.LayoutParams.() -> Unit = {}) {
@@ -714,5 +825,23 @@ class GameBarService : Hilt_GameBarService() {
         const val TAG = "GameBar"
         const val ACTION_START = "GameBar.ACTION_START"
         const val ACTION_STOP = "GameBar.ACTION_STOP"
+        const val ACTION_MEDIA_START = "GameBar.ACTION_MEDIA_START"
+        const val ACTION_MEDIA_STOP = "GameBar.ACTION_MEDIA_STOP"
+        private const val LEGACY_CHANNEL_ID = "gamespace_service_channel"
+        private const val FOREGROUND_CHANNEL_ID = "gamespace_service_channel_v2"
+        private const val FOREGROUND_NOTIFICATION_ID = 1001
+        private const val RELEASE_FLUSH_MS = 3_000L
+
+        fun startMedia(context: Context) {
+            val intent = Intent(context, GameBarService::class.java)
+                .setAction(ACTION_MEDIA_START)
+            runCatching { context.startForegroundService(intent) }
+        }
+
+        fun stopMedia(context: Context) {
+            val intent = Intent(context, GameBarService::class.java)
+                .setAction(ACTION_MEDIA_STOP)
+            runCatching { context.startService(intent) }
+        }
     }
 }

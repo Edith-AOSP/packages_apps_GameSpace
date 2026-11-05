@@ -29,7 +29,8 @@ Java_io_chaldeaprjkt_gamespace_discord_DiscordNative_nativeInit(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_io_chaldeaprjkt_gamespace_discord_DiscordNative_nativeSetPresence(
-        JNIEnv *, jobject, jstring, jstring, jstring, jstring, jlong) {
+        JNIEnv *, jobject, jint, jstring, jstring, jstring, jstring, jstring,
+        jstring, jstring, jlong) {
     return JNI_FALSE;
 }
 

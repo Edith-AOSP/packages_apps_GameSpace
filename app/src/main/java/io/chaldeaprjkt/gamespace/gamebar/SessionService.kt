@@ -35,7 +35,6 @@ import io.chaldeaprjkt.gamespace.data.SystemSettings
 import io.chaldeaprjkt.gamespace.discord.DiscordPresenceManager
 import io.chaldeaprjkt.gamespace.utils.GameModeUtils
 import io.chaldeaprjkt.gamespace.utils.ScreenUtils
-import io.chaldeaprjkt.gamespace.utils.isServiceRunning
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -144,6 +143,9 @@ class SessionService : Hilt_SessionService() {
         }
 
         session.unregister()
+        // The session service is going away for good, so the presence must not linger. The
+        // delayed grace period runs in-process and dies with the process, which used to leave
+        // a stale activity on Discord.
         discordPresence.stopGame()
         gameModeUtils.unbind()
         screenUtils.unbind()
@@ -173,7 +175,7 @@ class SessionService : Hilt_SessionService() {
                 }
                 session.register(app)
                 applyGameModeConfig(app)
-                discordPresence.startGame(app)
+                discordPresence.startGame(app, session.startedAt)
                 gameBar.onGameStart()
                 screenUtils.stayAwake = appSettings.stayAwake
                 screenUtils.lockGesture = appSettings.lockGesture
@@ -247,12 +249,10 @@ class SessionService : Hilt_SessionService() {
                 action = START
                 putExtra(EXTRA_PACKAGE_NAME, app)
             }
-            .takeIf { !context.isServiceRunning(SessionService::class.java) }
-            ?.run { context.startServiceAsUser(this, UserHandle.CURRENT) }
+            .run { context.startServiceAsUser(this, UserHandle.CURRENT) }
 
         fun stop(context: Context) = Intent(context, SessionService::class.java)
             .apply { action = STOP }
-            .takeIf { context.isServiceRunning(SessionService::class.java) }
-            ?.run { context.stopServiceAsUser(this, UserHandle.CURRENT) }
+            .run { context.stopServiceAsUser(this, UserHandle.CURRENT) }
     }
 }

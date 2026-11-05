@@ -21,6 +21,7 @@
     <string name="settings_title">Game Space</string>
     <string name="settings_summary">Manage your gaming setup</string>
     <string name="app_selector_label">Pick your game</string>
+    <string name="app_selector_media_label">Pick a media app</string>
     <string name="auto_brightness_disabled_title">Disable auto-brightness</string>
     <string name="auto_brightness_disabled_summary">Keep brightness settled while in-game</string>
     <string name="heads_up_disabled_summary">Disable Notification heads-up while in-game</string>
@@ -78,15 +79,23 @@
     <string name="panel_tiles_reset_message">This restores the default tile order and visibility.</string>
     <string name="panel_tiles_reset_confirm">Reset</string>
     <string name="panel_tiles_cancel">Cancel</string>
-    <string name="discord_presence_name">Game Space</string>
     <string name="discord_app_id_title">Application ID</string>
     <string name="discord_app_id_missing">Not configured</string>
     <string name="discord_restart_title">Restart Rich Presence</string>
     <string name="discord_restart_summary">Reconnect to Discord and reinitialize the presence context</string>
+    <string name="discord_restart_running">Presence is running</string>
+    <string name="discord_restart_waiting">Not running. Tap to reconnect.</string>
+    <string name="discord_restart_off">Rich Presence is off</string>
     <string name="discord_restart_done">Rich Presence restarted</string>
     <string name="discord_rpc_title">Discord Rich Presence</string>
     <string name="discord_rpc_summary">Show the game you are playing on Discord. Requires the Discord app signed in.</string>
     <string name="discord_rpc_unavailable">Requires the Discord app and a configured Social SDK application ID</string>
+    <string name="discord_media_title">Show media activity</string>
+    <string name="discord_media_summary">Show what you are listening to on Discord. Only apps in the list below are mirrored. Track details and artwork are looked up through the public iTunes search.</string>
+    <string name="discord_media_list_title">Media apps</string>
+    <string name="discord_media_add">Add app</string>
+    <string name="discord_media_remove">Tap to stop mirroring this app</string>
+    <string name="discord_media_remove_package">Tap to stop mirroring this app (%1$s)</string>
 
     <string name="ringer_mode_title">In-game ringer mode</string>
     <string-array name="ringer_mode_entries">
@@ -156,5 +165,8 @@
     <string name="bypass_charge_enabled_summary">Bypass charging</string>
     <string name="bypass_charge_enabled_title">Enable bypass charging while playing games</string>
     
-     <string name="gamespace_running">Game Space is running</string>
+     <string name="gamespace_running_summary">GameSpace keeps the game bar and Discord presence alive in the background</string>
+     <string name="gamespace_running_game_bar">Game bar is running</string>
+     <string name="gamespace_running_media">Media activity is running</string>
+     <string name="gamespace_running_game_bar_and_media">Game bar and media activity are running</string>
 </resources>
