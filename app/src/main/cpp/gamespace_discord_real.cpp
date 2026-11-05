@@ -221,7 +221,8 @@ Java_io_chaldeaprjkt_gamespace_discord_DiscordNative_nativeSetPresence(
     if (stateText.size() >= 2) {
         activity.SetState(stateText);
     }
-    activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::Details);
+    // StatusDisplayType is deliberately left unset: GameSpace does not ask Discord to put any
+    // of the activity fields in the compact status line.
 
     discordpp::ActivityTimestamps timestamps;
     timestamps.SetStart(static_cast<int64_t>(startEpoch));

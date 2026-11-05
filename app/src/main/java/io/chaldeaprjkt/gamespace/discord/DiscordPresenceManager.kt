@@ -635,8 +635,10 @@ class DiscordPresenceManager @Inject constructor(
                 // Discord renders "Playing <name>"; naming the game here keeps the header on the
                 // game instead of on the Discord application that publishes it.
                 activityName = gameState.label,
-                details = deviceModel(),
-                state = "",
+                // Second line of the card: what the game is running on. State carries the
+                // GameSpace marker so a glance at the card says where the presence came from.
+                details = "on " + deviceModel(),
+                state = GAMESPACE_MARKER,
                 largeImage = null,
                 largeText = null,
                 smallImage = null,
@@ -836,8 +838,27 @@ class DiscordPresenceManager @Inject constructor(
     private fun DiscordNative.Presence.identity(): String =
         "$type|$activityName|$details|$state|$startEpoch"
 
-    private fun deviceModel(): String =
-        Build.MODEL?.takeIf { it.isNotBlank() } ?: Build.DEVICE
+    /**
+     * The marketing name lives in the Settings overlay (`edith_about_device_title`), because
+     * `Build.MODEL` is only the model code on many devices. Settings is the source of truth for
+     * that string, so read the overlaid value from there instead of duplicating the overlay in
+     * GameSpace. Devices that do not overlay it keep their model.
+     */
+    private fun deviceModel(): String = deviceLabel
+
+    private val deviceLabel: String by lazy {
+        overlaidDeviceName() ?: Build.MODEL?.takeIf { it.isNotBlank() } ?: Build.DEVICE
+    }
+
+    private fun overlaidDeviceName(): String? = runCatching {
+        val resources = context.packageManager.getResourcesForApplication(SETTINGS_PACKAGE)
+        val id = resources.getIdentifier(
+            "edith_about_device_title",
+            "string",
+            SETTINGS_PACKAGE,
+        )
+        if (id == 0) null else resources.getString(id).takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     private fun appLabel(packageName: String): String = try {
         val pm = context.packageManager
@@ -849,6 +870,8 @@ class DiscordPresenceManager @Inject constructor(
     companion object {
         private const val TAG = "DiscordPresence"
         private const val DISCORD_PACKAGE = "com.discord"
+        private const val SETTINGS_PACKAGE = "com.android.settings"
+        private const val GAMESPACE_MARKER = "• Game Space"
         private const val MEDIA_PUBLISH_DEBOUNCE_MS = 900L
         private const val CONTEXT_FINISH_DELAY_MS = 1_500L
         private const val RESULT_WAIT_MS = 2_500L
