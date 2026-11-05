@@ -44,6 +44,7 @@ internal object DiscordNative {
         val largeImage: String?,
         val largeText: String?,
         val smallImage: String?,
+        val smallText: String?,
         val startEpoch: Long,
     )
 
@@ -78,6 +79,7 @@ internal object DiscordNative {
         largeImage: String?,
         largeText: String?,
         smallImage: String?,
+        smallText: String?,
         startEpoch: Long,
     ): Boolean
 
@@ -112,6 +114,7 @@ internal object DiscordNative {
             presence.largeImage,
             presence.largeText,
             presence.smallImage,
+            presence.smallText,
             presence.startEpoch,
         )
         if (!ok) Log.w(TAG, "nativeSetPresence returned false")

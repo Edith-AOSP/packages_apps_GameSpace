@@ -193,7 +193,7 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_io_chaldeaprjkt_gamespace_discord_DiscordNative_nativeSetPresence(
         JNIEnv *env, jobject, jint type, jstring activityNameValue, jstring detailsValue,
         jstring stateValue, jstring largeImageValue, jstring largeTextValue,
-        jstring smallImageValue, jlong startEpoch) {
+        jstring smallImageValue, jstring smallTextValue, jlong startEpoch) {
     if (!gClient) return JNI_FALSE;
 
     const std::string activityName = toStdString(env, activityNameValue);
@@ -202,6 +202,7 @@ Java_io_chaldeaprjkt_gamespace_discord_DiscordNative_nativeSetPresence(
     const std::string largeImage = toStdString(env, largeImageValue);
     const std::string largeText = toStdString(env, largeTextValue);
     const std::string smallImage = toStdString(env, smallImageValue);
+    const std::string smallText = toStdString(env, smallTextValue);
 
     discordpp::Activity activity;
     // Listening renders the "Listening to <player>" header; older clients are handled by the SDK.
@@ -228,13 +229,15 @@ Java_io_chaldeaprjkt_gamespace_discord_DiscordNative_nativeSetPresence(
     timestamps.SetStart(static_cast<int64_t>(startEpoch));
     activity.SetTimestamps(timestamps);
 
-    if (!largeImage.empty() || !largeText.empty() || !smallImage.empty()) {
+    if (!largeImage.empty() || !largeText.empty() || !smallImage.empty() ||
+            !smallText.empty()) {
         discordpp::ActivityAssets assets;
         if (!largeImage.empty()) assets.SetLargeImage(largeImage);
         if (!largeText.empty()) assets.SetLargeText(largeText);
-        // The small badge over the artwork; the caller only sets it when the large image has no
-        // artwork of its own.
+        // The small badge over the artwork, with its tooltip. The caller only sets it when the
+        // large image has artwork of its own.
         if (!smallImage.empty()) assets.SetSmallImage(smallImage);
+        if (!smallText.empty()) assets.SetSmallText(smallText);
         activity.SetAssets(assets);
     }
 

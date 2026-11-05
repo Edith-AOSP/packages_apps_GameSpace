@@ -635,13 +635,13 @@ class DiscordPresenceManager @Inject constructor(
                 // Discord renders "Playing <name>"; naming the game here keeps the header on the
                 // game instead of on the Discord application that publishes it.
                 activityName = gameState.label,
-                // Second line of the card: what the game is running on. State carries the
-                // GameSpace marker so a glance at the card says where the presence came from.
+                // Second line of the card: what the game is running on.
                 details = "on " + deviceModel(),
-                state = GAMESPACE_MARKER,
+                state = "",
                 largeImage = null,
                 largeText = null,
                 smallImage = null,
+                smallText = null,
                 startEpoch = gameState.startEpoch,
             )
 
@@ -653,6 +653,7 @@ class DiscordPresenceManager @Inject constructor(
                 largeImage = mediaArtworkUrl ?: mediaState.playerName,
                 largeText = mediaState.album,
                 smallImage = if (mediaArtworkUrl == null) mediaState.playerName else null,
+                smallText = null,
                 startEpoch = mediaStartEpoch,
             )
 
@@ -740,7 +741,17 @@ class DiscordPresenceManager @Inject constructor(
         scope.launch {
             val icon = icons.iconFor(packageName) ?: return@launch
             if (published != presence) return@launch
-            val withIcon = presence.copy(largeImage = icon)
+            val withIcon = if (gameState != null) {
+                // The GameSpace mark sits over the game artwork, so the card stays branded
+                // without a stray text line. The badge is this application's own Discord icon.
+                presence.copy(
+                    largeImage = icon,
+                    smallImage = GAMESPACE_BADGE,
+                    smallText = appName,
+                )
+            } else {
+                presence.copy(largeImage = icon)
+            }
             if (DiscordNative.setPresence(withIcon)) {
                 published = withIcon
                 store.activeId = withIcon.identity()
@@ -850,6 +861,9 @@ class DiscordPresenceManager @Inject constructor(
         overlaidDeviceName() ?: Build.MODEL?.takeIf { it.isNotBlank() } ?: Build.DEVICE
     }
 
+    /** The app's own label, so the badge tooltip follows the launcher name and its locale. */
+    private val appName: String by lazy { appLabel(context.packageName) }
+
     private fun overlaidDeviceName(): String? = runCatching {
         val resources = context.packageManager.getResourcesForApplication(SETTINGS_PACKAGE)
         val id = resources.getIdentifier(
@@ -871,7 +885,9 @@ class DiscordPresenceManager @Inject constructor(
         private const val TAG = "DiscordPresence"
         private const val DISCORD_PACKAGE = "com.discord"
         private const val SETTINGS_PACKAGE = "com.android.settings"
-        private const val GAMESPACE_MARKER = "• Game Space"
+        private const val GAMESPACE_BADGE =
+            "https://cdn.discordapp.com/app-icons/1565313391214592101/" +
+                "3740a2c3f7f170d658eecf61b30a2f77.png?size=128"
         private const val MEDIA_PUBLISH_DEBOUNCE_MS = 900L
         private const val CONTEXT_FINISH_DELAY_MS = 1_500L
         private const val RESULT_WAIT_MS = 2_500L
