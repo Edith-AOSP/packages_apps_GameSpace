@@ -54,6 +54,7 @@ class DiscordPresenceManager @Inject constructor(
         val packageName: String,
         val label: String,
         val startEpoch: Long,
+        val enabled: Boolean,
     )
 
     private var game: GameState? = null
@@ -213,9 +214,12 @@ class DiscordPresenceManager @Inject constructor(
         // The panel's timer restarts whenever a session is registered, so the Discord timer has
         // to follow the same value instead of keeping an older one for the same package.
         val startEpoch = start / 1000L
+        val enabled = isGameEnabled(packageName)
         if (!sameGame || startEpoch != game?.startEpoch) {
-            game = GameState(packageName, appLabel(packageName), startEpoch)
+            game = GameState(packageName, appLabel(packageName), startEpoch, enabled)
         }
+        // A hidden game still needs tracking, but it must not wake the Discord host on its own.
+        if (!owesPresence()) return
         ensureContext()
         publish()
     }
@@ -227,6 +231,23 @@ class DiscordPresenceManager @Inject constructor(
         game = null
         publish()
     }
+
+    /**
+     * Shows or hides the presence for one game without waiting for the next session.
+     *
+     * The library stores the exceptions, so this only has to react when the toggled game is the
+     * one currently running; otherwise the next session reads the new value on its own.
+     */
+    fun setGameEnabled(packageName: String, enabled: Boolean) {
+        val current = game ?: return
+        if (current.packageName != packageName || current.enabled == enabled) return
+        game = current.copy(enabled = enabled)
+        if (enabled) ensureContext()
+        publish()
+    }
+
+    private fun isGameEnabled(packageName: String): Boolean =
+        packageName !in appSettings.discordGameDisabled
 
     // endregion
 
@@ -335,8 +356,9 @@ class DiscordPresenceManager @Inject constructor(
     // endregion
 
     fun restart() {
-        val packageName = game?.packageName
-        val start = game?.startEpoch ?: 0L
+        val previous = game
+        val packageName = previous?.packageName
+        val start = previous?.startEpoch ?: 0L
 
         game = null
         published = null
@@ -347,6 +369,7 @@ class DiscordPresenceManager @Inject constructor(
                 packageName,
                 appLabel(packageName),
                 start.takeIf { it > 0 } ?: (System.currentTimeMillis() / 1000L),
+                previous?.enabled ?: isGameEnabled(packageName),
             )
         }
         // Show the reconnect window right away instead of leaving the row on its old verdict.
@@ -598,7 +621,7 @@ class DiscordPresenceManager @Inject constructor(
 
     /** Whether Discord may still be showing something of ours, or should show something. */
     private fun owesPresence(): Boolean =
-        game != null || media != null || published != null || store.activeId != null
+        game?.enabled == true || media != null || published != null || store.activeId != null
 
     private fun discordVersion(): String = try {
         context.packageManager.getPackageInfo(DISCORD_PACKAGE, 0).versionName ?: "?"
@@ -619,7 +642,7 @@ class DiscordPresenceManager @Inject constructor(
     }
 
     private fun publishNow() {
-        val gameState = game
+        val gameState = game?.takeIf { it.enabled }
         val mediaState = media
 
         if (!owesPresence()) {

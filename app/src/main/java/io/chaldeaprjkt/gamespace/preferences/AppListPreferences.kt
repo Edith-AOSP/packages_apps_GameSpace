@@ -23,7 +23,9 @@ import android.util.AttributeSet
 import androidx.activity.result.ActivityResult
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import com.android.settingslib.PrimarySwitchPreference
 import io.chaldeaprjkt.gamespace.R
+import io.chaldeaprjkt.gamespace.data.AppSettings
 import io.chaldeaprjkt.gamespace.data.GameConfig
 import io.chaldeaprjkt.gamespace.data.UserGame
 import io.chaldeaprjkt.gamespace.settings.PerAppSettingsFragment
@@ -44,7 +46,12 @@ class AppListPreferences @JvmOverloads constructor(context: Context, attrs: Attr
         context.entryPointOf<ServiceViewEntryPoint>().gameModeUtils()
     }
 
+    private val appSettings by lazy {
+        context.entryPointOf<ServiceViewEntryPoint>().appSettings()
+    }
+
     private lateinit var registeredAppClickAction: (String) -> Unit
+    private var registeredAppPresenceAction: ((String, Boolean) -> Unit)? = null
 
     init {
         isOrderingAsAdded = false
@@ -76,15 +83,28 @@ class AppListPreferences @JvmOverloads constructor(context: Context, attrs: Attr
         addPreference(makeAddPref)
         apps.filter { getAppInfo(it.packageName) != null }
             .map {
-                val info = getAppInfo(it.packageName)
-                Preference(context).apply {
-                    key = it.packageName
+                val packageName = it.packageName
+                val info = getAppInfo(packageName)
+                PrimarySwitchPreference(context).apply {
+                    key = packageName
                     title = info?.loadLabel(context.packageManager)
                     summary = context.describeGameMode(it.mode)
                     icon = info?.loadIcon(context.packageManager)
                     layoutResource = R.layout.library_item
                     isPersistent = false
+                    isChecked = packageName !in appSettings.discordGameDisabled
                     onPreferenceClickListener = this@AppListPreferences
+                    setOnPreferenceChangeListener { _, newValue ->
+                        val enabled = newValue == true
+                        // Keep the exceptions in sync with the switch before the manager looks
+                        // at them, since it may clear or publish right away.
+                        appSettings.discordGameDisabled =
+                            appSettings.discordGameDisabled.let { disabled ->
+                                if (enabled) disabled - packageName else disabled + packageName
+                            }
+                        registeredAppPresenceAction?.invoke(packageName, enabled)
+                        true
+                    }
                 }
             }
             .sortedBy { it.title.toString().lowercase() }
@@ -121,6 +141,11 @@ class AppListPreferences @JvmOverloads constructor(context: Context, attrs: Attr
 
     fun onRegisteredAppClick(action: (String) -> Unit) {
         registeredAppClickAction = action
+    }
+
+    /** Notifies the caller when a game's Rich Presence switch changes. */
+    fun onRegisteredAppPresenceChange(action: (String, Boolean) -> Unit) {
+        registeredAppPresenceAction = action
     }
 
     fun usePerAppResult(result: ActivityResult?) {

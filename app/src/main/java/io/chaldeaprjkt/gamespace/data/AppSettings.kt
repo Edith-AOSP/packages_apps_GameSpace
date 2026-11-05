@@ -95,6 +95,16 @@ class AppSettings @Inject constructor(private val context: Context) {
             else putStringSet(KEY_DISCORD_MEDIA_PACKAGES, value)
         }.apply()
 
+    /**
+     * Registered games whose presence is hidden from Discord.
+     *
+     * The list stores the exceptions rather than the allowed packages, so every newly added game
+     * starts with presence on and existing installs keep their current behaviour.
+     */
+    var discordGameDisabled: Set<String>
+        get() = db.getStringSet(KEY_DISCORD_GAME_DISABLED, emptySet())?.toSet().orEmpty()
+        set(value) = db.edit().putStringSet(KEY_DISCORD_GAME_DISABLED, value).apply()
+
     var panelTiles
         get() = db.getString(KEY_PANEL_TILES, "").orEmpty()
         set(value) = db.edit().putString(KEY_PANEL_TILES, value).apply()
@@ -111,6 +121,7 @@ class AppSettings @Inject constructor(private val context: Context) {
         const val KEY_DISCORD_RPC = "gamespace_discord_rpc"
         const val KEY_DISCORD_MEDIA = "gamespace_discord_media"
         const val KEY_DISCORD_MEDIA_PACKAGES = "gamespace_discord_media_packages"
+        const val KEY_DISCORD_GAME_DISABLED = "gamespace_discord_game_disabled"
         const val KEY_DISCORD_MEDIA_LIST = "gamespace_discord_media_list"
         const val KEY_PANEL_TILES = "gamespace_panel_tiles"
     }
