@@ -27,9 +27,11 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import dagger.hilt.android.AndroidEntryPoint
 import io.chaldeaprjkt.gamespace.R
+import io.chaldeaprjkt.gamespace.data.AppSettings
 import io.chaldeaprjkt.gamespace.data.GameConfig
 import io.chaldeaprjkt.gamespace.data.SystemSettings
 import io.chaldeaprjkt.gamespace.data.UserGame
+import io.chaldeaprjkt.gamespace.discord.DiscordPresenceManager
 import io.chaldeaprjkt.gamespace.utils.GameModeUtils
 import javax.inject.Inject
 
@@ -42,6 +44,12 @@ class PerAppSettingsFragment : Hilt_PerAppSettingsFragment(),
 
     @Inject
     lateinit var gameModeUtils: GameModeUtils
+
+    @Inject
+    lateinit var appSettings: AppSettings
+
+    @Inject
+    lateinit var discordPresence: DiscordPresenceManager
 
     private val currentGame by lazy {
         activity?.intent?.getStringExtra(PerAppSettingsActivity.EXTRA_PACKAGE)?.let {
@@ -88,6 +96,16 @@ class PerAppSettingsFragment : Hilt_PerAppSettingsFragment(),
             onPreferenceChangeListener = this@PerAppSettingsFragment
 
         }
+        findPreference<SwitchPreferenceCompat>(PREF_DISCORD_RPC)?.apply {
+            val packageName = currentGame?.packageName
+            isChecked = packageName == null || packageName !in appSettings.discordGameDisabled
+            if (!DiscordPresenceManager.isSupported(requireContext())) {
+                isEnabled = false
+                summary = context.getString(R.string.discord_rpc_unavailable)
+                return@apply
+            }
+            onPreferenceChangeListener = this@PerAppSettingsFragment
+        }
         findPreference<Preference>(PREF_UNREGISTER)?.apply {
             summary = context.getString(
                 R.string.per_app_unregister,
@@ -118,6 +136,16 @@ class PerAppSettingsFragment : Hilt_PerAppSettingsFragment(),
                 gameModeUtils.setIntervention(gameInfo.packageName, newModes)
                 return true
             }
+            PREF_DISCORD_RPC -> {
+                val enabled = newValue as Boolean
+                // Store the exception before the manager reads it: disabling can clear the
+                // presence immediately.
+                appSettings.discordGameDisabled = appSettings.discordGameDisabled.let { disabled ->
+                    if (enabled) disabled - gameInfo.packageName else disabled + gameInfo.packageName
+                }
+                discordPresence.setGameEnabled(gameInfo.packageName, enabled)
+                return true
+            }
         }
         return false
     }
@@ -125,6 +153,7 @@ class PerAppSettingsFragment : Hilt_PerAppSettingsFragment(),
     companion object {
         const val PREF_PREFERRED_MODE = "per_app_preferred_mode"
         const val PREF_USE_ANGLE = "per_app_use_angle"
+        const val PREF_DISCORD_RPC = "per_app_discord_rpc"
         const val PREF_UNREGISTER = "per_app_unregister"
     }
 }

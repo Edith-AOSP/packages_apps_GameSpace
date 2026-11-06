@@ -37,6 +37,14 @@
         android:summary="@string/per_app_angle_summary"
         android:title="@string/per_app_angle_title" />
 
+    <androidx.preference.SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="per_app_discord_rpc"
+        android:persistent="false"
+        android:summary="@string/per_app_discord_rpc_summary"
+        android:title="@string/per_app_discord_rpc_title"
+        app:allowDividerAbove="true" />
+
     <Preference
         android:icon="@drawable/ic_remove"
         android:key="per_app_unregister"

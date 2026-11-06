@@ -85,9 +85,6 @@ class SettingsFragment : Hilt_SettingsFragment() {
                 putExtra(PerAppSettingsActivity.EXTRA_PACKAGE, it)
             })
         }
-        apps?.onRegisteredAppPresenceChange { packageName, enabled ->
-            discordPresence.setGameEnabled(packageName, enabled)
-        }
 
         findPreference<Preference>(AppListPreferences.KEY_ADD_GAME)
             ?.setOnPreferenceClickListener {

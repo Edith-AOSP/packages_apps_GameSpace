@@ -235,14 +235,24 @@ class DiscordPresenceManager @Inject constructor(
     /**
      * Shows or hides the presence for one game without waiting for the next session.
      *
-     * The library stores the exceptions, so this only has to react when the toggled game is the
-     * one currently running; otherwise the next session reads the new value on its own.
+     * Disabling always reaches [publish]: the session may already be gone while Discord still
+     * shows its activity, and the stored presence is the only thing a clear needs. Enabling only
+     * matters for the game that is actually running; every other game reads the new value when
+     * its next session starts.
      */
     fun setGameEnabled(packageName: String, enabled: Boolean) {
-        val current = game ?: return
-        if (current.packageName != packageName || current.enabled == enabled) return
-        game = current.copy(enabled = enabled)
-        if (enabled) ensureContext()
+        val current = game
+        if (current?.packageName == packageName && current.enabled != enabled) {
+            game = current.copy(enabled = enabled)
+        }
+        if (!enabled) {
+            // A no-op when nothing is owed, but it clears a presence left behind by a session
+            // that is no longer tracked.
+            publish()
+            return
+        }
+        if (current?.packageName != packageName) return
+        ensureContext()
         publish()
     }
 
